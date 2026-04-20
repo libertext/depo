@@ -1,8 +1,9 @@
 /* Av. Yalın Anlatır · Script Studio
    Vanilla JS, no deps. Data lives in localStorage. */
 
-const STORAGE_KEY = 'yalin-anlatir.archive.v1';
-const DRAFT_KEY   = 'yalin-anlatir.draft.v1';
+const STORAGE_KEY  = 'yalin-anlatir.archive.v1';
+const DRAFT_KEY    = 'yalin-anlatir.draft.v1';
+const SETTINGS_KEY = 'yalin-anlatir.settings.v1';
 
 const EMOJIS = ['⚖️','🚓','👮','🧑‍⚖️','📜','📝','🔒','🔓','💼','🏛️','👤','🚗','🚨','⏱️','📞','💰','🏠','👨‍👩‍👧','💍','📄','🚫','✅','❗','❓','💡','🎯'];
 
@@ -134,6 +135,7 @@ const editor = {
     $('#btn-save').addEventListener('click', () => this.save());
     $('#btn-clear').addEventListener('click', () => this.clear());
     $('#btn-sample').addEventListener('click', () => this.loadSample());
+    $('#btn-gen').addEventListener('click', () => this.generate());
 
     // keyboard shortcuts
     document.addEventListener('keydown', (e) => {
@@ -245,6 +247,42 @@ const editor = {
     this.setData({});
     this.saveDraft();
     toast('🧹 Temizlendi');
+  },
+
+  async generate() {
+    const topic = this.els.topic.value.trim();
+    if (!topic) {
+      toast('Önce bir konu başlığı yaz');
+      this.els.topic.focus();
+      return;
+    }
+    const s = settings.load();
+    if (!s.apiKey) {
+      toast('Önce ⚙️ Ayarlar\'dan API anahtarı gir');
+      settings.open();
+      return;
+    }
+    const btn = $('#btn-gen');
+    const origLabel = btn.textContent;
+    btn.disabled = true;
+    btn.classList.add('is-loading');
+    btn.textContent = '⏳ Üretiliyor';
+    try {
+      const out = await ai.generate(topic, s);
+      this.els.content.value = out.content || '';
+      this.els.reels.value   = out.reels   || '';
+      this.els.tags.value    = out.tags    || '';
+      this.render();
+      this.saveDraft();
+      toast('⚡ Üretildi');
+    } catch (e) {
+      console.error(e);
+      toast('Üretim başarısız: ' + (e.message || 'bilinmeyen hata'));
+    } finally {
+      btn.disabled = false;
+      btn.classList.remove('is-loading');
+      btn.textContent = origLabel;
+    }
   },
 
   loadSample() {
@@ -383,6 +421,160 @@ const archive = {
   },
 };
 
+/* ---------------- Settings ---------------- */
+const settings = {
+  defaults: { apiKey: '', model: 'claude-opus-4-7' },
+
+  load() {
+    try {
+      const d = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+      return { ...this.defaults, ...d };
+    } catch { return { ...this.defaults }; }
+  },
+
+  saveValues(v) { localStorage.setItem(SETTINGS_KEY, JSON.stringify(v)); },
+
+  modal: null,
+
+  init() {
+    this.modal = $('#modal-settings');
+    $('#btn-settings').addEventListener('click', () => this.open());
+    this.modal.addEventListener('click', (e) => {
+      if (e.target.matches('[data-close]')) this.close();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (!this.modal.hidden && e.key === 'Escape') this.close();
+    });
+    $('#s-save').addEventListener('click', () => {
+      const v = {
+        apiKey: $('#s-api-key').value.trim(),
+        model:  $('#s-model').value,
+      };
+      this.saveValues(v);
+      this.close();
+      toast(v.apiKey ? '⚙️ Ayarlar kaydedildi' : '⚙️ Anahtar boş — üret kullanılmaz');
+    });
+  },
+
+  open() {
+    const s = this.load();
+    $('#s-api-key').value = s.apiKey;
+    $('#s-model').value   = s.model;
+    this.modal.hidden = false;
+    this.modal.setAttribute('aria-hidden', 'false');
+    setTimeout(() => $('#s-api-key').focus(), 30);
+  },
+
+  close() {
+    this.modal.hidden = true;
+    this.modal.setAttribute('aria-hidden', 'true');
+  },
+};
+
+/* ---------------- AI (Claude API) ---------------- */
+const AI_SYSTEM_PROMPT = `Sen "Av. Yalın Anlatır" karakteri için TikTok / Instagram Reels / YouTube Shorts video metinleri hazırlayan uzman bir Türk hukuk içerik editörüsün.
+
+KARAKTER SESİ:
+- Sade, net Türkçe. Hukuki terim kullanınca hemen yanında günlük karşılığını ver.
+- Tarafsız, didaktik, güven veren. Yasal tavsiye değil; bilgilendirme.
+- Kısa cümleler. 20-30 saniyelik okuma (yaklaşık 55-80 kelime).
+
+GÖREV: Kullanıcı sana bir konu başlığı verecek. Tam olarak "build_script" aracını çağırarak üç alan döndür. Başka metin üretme.
+
+ALAN 1 — content (İçerik paragrafı):
+- 3-5 kısa cümle, 55-80 kelime arası.
+- 1. cümle: kavramın özü / birinci kavramın tanımı.
+- 2. cümle: ikinci kavram veya karşıt durum.
+- 3. cümle: usul / şart / hukuka uygunluk vurgusu (yetki, sebep, delil, süre, karar mercii vb.).
+- Son cümle MUTLAKA "Kısacası:" ile başlasın ve tek cümlelik net, akılda kalıcı özet olsun.
+- "Her somut olay farklıdır", "profesyonel destek alın" gibi uyarıları SIKIŞTIRMA.
+
+ALAN 2 — reels (TikTok-Reels açıklaması, emojili):
+- İlk satır: çarpıcı soru veya slogan, başında tema emojisi (⚖️ 🚓 📜 🔒 👮 🧑‍⚖️ 📝 💼 🏛️ vb.).
+- Sonra boş satır.
+- 3-4 satır: her biri EMOJİ + 2-5 kelimelik kilit ifade. Maddeleme işareti (-, *) KULLANMA.
+- Sonra boş satır.
+- Son satır: mesajın özeti, tercihen ⚖️ ile.
+- Satırları gerçek satır sonu (\\n) ile ayır.
+
+ALAN 3 — tags (Hashtag satırı):
+- Boşlukla ayrılmış 5-7 hashtag.
+- #hukuk #yalınanlatır #avukat MUTLAKA yer alsın.
+- Konuya özgü en az 1-2 hashtag ekle: #arama, #cezahukuku, #tutuklama, #borçlar, #ailehukuku, #iskazasi, #kvkk, #işhukuku, #kira, #miras vb.
+
+HUKUKİ DOĞRULUK:
+- Türkiye Cumhuriyeti mevzuatına göre yaz (CMK, TCK, TMK, TBK, İK vb.).
+- Emin olmadığın madde numarası, süre veya ceza miktarı UYDURMA. Genel hukuki ilkeyle yetin.
+- Tavsiye yönlendirmesi yapma; bilgilendirme tonunda kal.
+
+Her çıktı aynı yapısal tutarlılıkta olsun. Sadece aracı çağır, önsöz veya açıklama ekleme.`;
+
+const ai = {
+  async generate(topic, s) {
+    const body = {
+      model: s.model || 'claude-opus-4-7',
+      max_tokens: 1024,
+      system: [
+        { type: 'text', text: AI_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
+      ],
+      tools: [{
+        name: 'build_script',
+        description: 'Av. Yalın Anlatır video metninin üç parçasını döndür.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            content: {
+              type: 'string',
+              description: 'İçerik paragrafı: 3-5 kısa cümle, ~55-80 kelime, son cümle "Kısacası:" ile başlar.',
+            },
+            reels: {
+              type: 'string',
+              description: 'TikTok/Reels emoji açıklaması. Çarpıcı emojili başlık satırı + boş satır + 3-4 emojili kilit satır + boş satır + emojili kapanış. Satırlar \\n ile.',
+            },
+            tags: {
+              type: 'string',
+              description: 'Boşlukla ayrılmış 5-7 hashtag. #hukuk #yalınanlatır #avukat mutlaka yer alsın.',
+            },
+          },
+          required: ['content', 'reels', 'tags'],
+        },
+      }],
+      tool_choice: { type: 'tool', name: 'build_script' },
+      messages: [
+        { role: 'user', content: `Konu: ${topic}\n\nBu konu için tam şablonda bir video metni üret.` },
+      ],
+    };
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': s.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      let detail = '';
+      try {
+        const err = await res.json();
+        detail = err?.error?.message || JSON.stringify(err);
+      } catch {
+        detail = await res.text().catch(() => '');
+      }
+      const short = (detail || '').slice(0, 160);
+      throw new Error(`${res.status} ${short}`);
+    }
+
+    const data = await res.json();
+    const block = (data.content || []).find(b => b.type === 'tool_use' && b.name === 'build_script');
+    if (!block || !block.input) throw new Error('Beklenen araç çağrısı dönmedi');
+    return block.input;
+  },
+};
+
 /* ---------------- Tabs ---------------- */
 const tabs = {
   init() {
@@ -410,4 +602,5 @@ document.addEventListener('DOMContentLoaded', () => {
   tabs.init();
   editor.init();
   archive.init();
+  settings.init();
 });
