@@ -509,40 +509,33 @@ HUKUKİ DOĞRULUK:
 
 Her çıktı aynı yapısal tutarlılıkta olsun. Sadece aracı çağır, önsöz veya açıklama ekleme.`;
 
+const IDEAS_SYSTEM_PROMPT = `Sen "Av. Yalın Anlatır" karakteri için TikTok / Reels / Shorts video konu başlıkları öneren Türk hukuk editörüsün.
+
+GÖREV: Kullanıcı bir hukuk alanı verecek. O alanda "suggest_topics" aracını çağırarak 6-8 çarpıcı konu başlığı döndür.
+
+BAŞLIK KURALLARI:
+- Her başlık 4-10 kelime arası, sade Türkçe.
+- Günlük yaşamda merak edilen, geniş kitleyi ilgilendiren konular seç.
+- Tercihen iki kavramı karşılaştır ("X ile Y arasındaki fark") veya net soru sor ("X ne demek?", "X nasıl ispatlanır?").
+- Her başlık farklı bir noktayı işlesin; tekrar etme.
+- "Hukukta", "Türk hukukunda" gibi gereksiz önek kullanma.
+- Karışık alan seçildiyse farklı dallardan (aile, ceza, iş, tazminat, kira, miras, tüketici) dengeli dağılım yap.
+
+HUKUKİ DOĞRULUK:
+- Türkiye Cumhuriyeti mevzuatına uygun olsun (CMK, TCK, TMK, TBK, İK vb.).
+- Uydurma kurum, süreç veya kavram YAZMA.
+
+Sadece aracı çağır, başka metin üretme.`;
+
 const ai = {
-  async generate(topic, s) {
+  async _call({ system, tool, userMessage, s }) {
     const body = {
       model: s.model || 'claude-opus-4-7',
       max_tokens: 1024,
-      system: [
-        { type: 'text', text: AI_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
-      ],
-      tools: [{
-        name: 'build_script',
-        description: 'Av. Yalın Anlatır video metninin üç parçasını döndür.',
-        input_schema: {
-          type: 'object',
-          properties: {
-            content: {
-              type: 'string',
-              description: 'İçerik paragrafı: 3-5 kısa cümle, ~55-80 kelime, son cümle "Kısacası:" ile başlar.',
-            },
-            reels: {
-              type: 'string',
-              description: 'TikTok/Reels emoji açıklaması. Çarpıcı emojili başlık satırı + boş satır + 3-4 emojili kilit satır + boş satır + emojili kapanış. Satırlar \\n ile.',
-            },
-            tags: {
-              type: 'string',
-              description: 'Boşlukla ayrılmış 5-7 hashtag. #hukuk #yalınanlatır #avukat mutlaka yer alsın.',
-            },
-          },
-          required: ['content', 'reels', 'tags'],
-        },
-      }],
-      tool_choice: { type: 'tool', name: 'build_script' },
-      messages: [
-        { role: 'user', content: `Konu: ${topic}\n\nBu konu için tam şablonda bir video metni üret.` },
-      ],
+      system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
+      tools: [tool],
+      tool_choice: { type: 'tool', name: tool.name },
+      messages: [{ role: 'user', content: userMessage }],
     };
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -564,14 +557,173 @@ const ai = {
       } catch {
         detail = await res.text().catch(() => '');
       }
-      const short = (detail || '').slice(0, 160);
-      throw new Error(`${res.status} ${short}`);
+      throw new Error(`${res.status} ${(detail || '').slice(0, 160)}`);
     }
 
     const data = await res.json();
-    const block = (data.content || []).find(b => b.type === 'tool_use' && b.name === 'build_script');
+    const block = (data.content || []).find(b => b.type === 'tool_use' && b.name === tool.name);
     if (!block || !block.input) throw new Error('Beklenen araç çağrısı dönmedi');
     return block.input;
+  },
+
+  generate(topic, s) {
+    return this._call({
+      system: AI_SYSTEM_PROMPT,
+      tool: {
+        name: 'build_script',
+        description: 'Av. Yalın Anlatır video metninin üç parçasını döndür.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            content: {
+              type: 'string',
+              description: 'İçerik paragrafı: 3-5 kısa cümle, ~55-80 kelime, son cümle "Kısacası:" ile başlar.',
+            },
+            reels: {
+              type: 'string',
+              description: 'TikTok/Reels emoji açıklaması. Çarpıcı emojili başlık satırı + boş satır + 3-4 emojili kilit satır + boş satır + emojili kapanış. Satırlar \\n ile.',
+            },
+            tags: {
+              type: 'string',
+              description: 'Boşlukla ayrılmış 5-7 hashtag. #hukuk #yalınanlatır #avukat mutlaka yer alsın.',
+            },
+          },
+          required: ['content', 'reels', 'tags'],
+        },
+      },
+      userMessage: `Konu: ${topic}\n\nBu konu için tam şablonda bir video metni üret.`,
+      s,
+    });
+  },
+
+  async suggestTopics(areaLabel, s) {
+    const r = await this._call({
+      system: IDEAS_SYSTEM_PROMPT,
+      tool: {
+        name: 'suggest_topics',
+        description: 'Verilen hukuk alanı için video konu başlıklarını döndür.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            topics: {
+              type: 'array',
+              items: { type: 'string' },
+              minItems: 6,
+              maxItems: 8,
+              description: '6-8 adet çarpıcı, kısa konu başlığı.',
+            },
+          },
+          required: ['topics'],
+        },
+      },
+      userMessage: `Alan: ${areaLabel}\n\nBu alan için 6-8 çarpıcı, merak uyandıran video konu başlığı öner. Daha önce çok işlenmemiş ama geniş kitleyi ilgilendiren başlıklar seç.`,
+      s,
+    });
+    return Array.isArray(r.topics) ? r.topics : [];
+  },
+};
+
+/* ---------------- Ideas (topic suggestions) ---------------- */
+const AREA_LABELS = {
+  karisik:  'Karışık — hukukun farklı alanlarından dengeli seçim',
+  aile:     'Aile Hukuku',
+  ceza:     'Ceza Hukuku',
+  is:       'İş Hukuku',
+  tazminat: 'Tazminat Hukuku',
+  kira:     'Kira ve Gayrimenkul Hukuku',
+  tuketici: 'Tüketici Hukuku',
+  miras:    'Miras Hukuku',
+  kvkk:     'KVKK ve Dijital Hukuk',
+  borclar:  'Borçlar Hukuku ve Sözleşmeler',
+};
+
+const ideas = {
+  modal: null,
+
+  init() {
+    this.modal = $('#modal-ideas');
+    $('#btn-ideas').addEventListener('click', () => this.open());
+    $('#i-gen').addEventListener('click', () => this.suggest());
+
+    this.modal.addEventListener('click', (e) => {
+      if (e.target.matches('[data-close]')) { this.close(); return; }
+      const item = e.target.closest('.idea-item');
+      if (item) this.pick(item.dataset.topic);
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (!this.modal.hidden && e.key === 'Escape') this.close();
+    });
+  },
+
+  open() {
+    this.modal.hidden = false;
+    this.modal.setAttribute('aria-hidden', 'false');
+    setTimeout(() => $('#i-area').focus(), 30);
+  },
+
+  close() {
+    this.modal.hidden = true;
+    this.modal.setAttribute('aria-hidden', 'true');
+  },
+
+  pick(topic) {
+    if (!topic) return;
+    editor.editingId = null;
+    editor.els.topic.value = topic;
+    editor.render();
+    editor.saveDraft();
+    this.close();
+    editor.els.topic.focus();
+    toast('💡 Başlık eklendi — ⚡ Üret\'e bas');
+  },
+
+  renderList(topics) {
+    const list = $('#ideas-list');
+    const empty = $('#ideas-empty');
+    list.innerHTML = '';
+    if (!topics.length) {
+      empty.classList.remove('is-hidden');
+      empty.textContent = 'Başlık üretilemedi. Tekrar dene.';
+      return;
+    }
+    empty.classList.add('is-hidden');
+    topics.forEach(t => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'idea-item';
+      b.dataset.topic = t;
+      b.textContent = t;
+      list.appendChild(b);
+    });
+  },
+
+  async suggest() {
+    const s = settings.load();
+    if (!s.apiKey) {
+      toast('Önce ⚙️ Ayarlar\'dan API anahtarı gir');
+      this.close();
+      settings.open();
+      return;
+    }
+    const area = $('#i-area').value;
+    const label = AREA_LABELS[area] || area;
+    const btn = $('#i-gen');
+    const origLabel = btn.textContent;
+    btn.disabled = true;
+    btn.classList.add('is-loading');
+    btn.textContent = '⏳ Öneriliyor';
+    try {
+      const topics = await ai.suggestTopics(label, s);
+      this.renderList(topics);
+    } catch (e) {
+      console.error(e);
+      toast('Öneri başarısız: ' + (e.message || 'hata'));
+    } finally {
+      btn.disabled = false;
+      btn.classList.remove('is-loading');
+      btn.textContent = origLabel;
+    }
   },
 };
 
@@ -603,4 +755,5 @@ document.addEventListener('DOMContentLoaded', () => {
   editor.init();
   archive.init();
   settings.init();
+  ideas.init();
 });

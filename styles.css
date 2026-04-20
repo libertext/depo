@@ -459,6 +459,47 @@ input[type="search"]#a-search:focus {
 }
 .field input[type="password"] { letter-spacing: .5px; }
 
+/* ===== Ideas list ===== */
+.ideas-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: 4px 0 12px;
+}
+.ideas-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+.ideas-list:empty { display: none; }
+.idea-item {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  transition: .15s;
+  line-height: 1.4;
+}
+.idea-item:hover {
+  border-color: var(--accent);
+  color: var(--accent-2);
+  transform: translateX(2px);
+}
+.ideas-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  padding: 16px 10px;
+  text-align: center;
+}
+.ideas-empty.is-hidden { display: none; }
+
 /* ===== Responsive tweaks ===== */
 @media (max-width: 560px) {
   .topbar { padding: 12px 14px; }

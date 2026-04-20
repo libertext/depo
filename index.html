@@ -36,6 +36,7 @@
           <div class="card-head">
             <h2>Video Metni</h2>
             <div class="head-actions">
+              <button class="btn ghost" id="btn-ideas" title="AI ile konu önerisi al">💡 Fikir Öner</button>
               <button class="btn ghost" id="btn-clear" title="Alanları temizle">🧹 Temizle</button>
               <button class="btn ghost" id="btn-sample" title="Örnek doldur">✨ Örnek</button>
             </div>
@@ -116,6 +117,40 @@
   </main>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- ============ IDEAS MODAL ============ -->
+  <div class="modal" id="modal-ideas" hidden aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-dialog" role="dialog" aria-labelledby="ideas-title" aria-modal="true">
+      <header class="modal-head">
+        <h2 id="ideas-title">💡 Fikir Öner</h2>
+        <button class="icon-btn" data-close aria-label="Kapat">✕</button>
+      </header>
+      <div class="modal-body">
+        <label class="field">
+          <span class="label">Hukuk Alanı</span>
+          <select id="i-area">
+            <option value="karisik">Karışık (farklı alanlardan)</option>
+            <option value="aile">Aile Hukuku</option>
+            <option value="ceza">Ceza Hukuku</option>
+            <option value="is">İş Hukuku</option>
+            <option value="tazminat">Tazminat Hukuku</option>
+            <option value="kira">Kira / Gayrimenkul</option>
+            <option value="tuketici">Tüketici Hukuku</option>
+            <option value="miras">Miras Hukuku</option>
+            <option value="kvkk">KVKK / Dijital</option>
+            <option value="borclar">Borçlar / Sözleşmeler</option>
+          </select>
+          <span class="hint">Alan seç → ⚡ Başlık Öner → bir başlığa tıkla, Konu'ya yapışır.</span>
+        </label>
+        <div class="ideas-actions">
+          <button class="btn primary" id="i-gen">⚡ Başlık Öner</button>
+        </div>
+        <div class="ideas-list" id="ideas-list"></div>
+        <p class="ideas-empty" id="ideas-empty">Henüz öneri yok. ⚡ Başlık Öner'e bas.</p>
+      </div>
+    </div>
+  </div>
 
   <!-- ============ SETTINGS MODAL ============ -->
   <div class="modal" id="modal-settings" hidden aria-hidden="true">
