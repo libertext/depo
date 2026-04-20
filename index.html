@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1220" />
+  <title>Av. Yalın Anlatır · Script Studio</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='52' font-size='52'%3E%E2%9A%96%EF%B8%8F%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">⚖️</span>
+      <div class="brand-text">
+        <h1>Av. Yalın Anlatır</h1>
+        <p>Script Studio · Shorts / Reels / TikTok</p>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab is-active" data-tab="editor" role="tab" aria-selected="true">✍️ Yeni</button>
+      <button class="tab" data-tab="archive" role="tab" aria-selected="false">
+        🗂️ Arşiv <span class="count" id="archiveCount">0</span>
+      </button>
+    </nav>
+  </header>
+
+  <main class="container">
+
+    <!-- ============ EDITOR VIEW ============ -->
+    <section class="view is-active" id="view-editor" role="tabpanel">
+      <div class="grid">
+
+        <div class="card form-card">
+          <div class="card-head">
+            <h2>Video Metni</h2>
+            <div class="head-actions">
+              <button class="btn ghost" id="btn-clear" title="Alanları temizle">🧹 Temizle</button>
+              <button class="btn ghost" id="btn-sample" title="Örnek doldur">✨ Örnek</button>
+            </div>
+          </div>
+
+          <label class="field">
+            <span class="label">Konu</span>
+            <input type="text" id="f-topic" placeholder="Örn. Üst araması ile araç araması arasındaki fark" maxlength="120" />
+            <span class="hint"><span id="c-topic">0</span>/120 karakter</span>
+          </label>
+
+          <label class="field">
+            <span class="label">İçerik <em>(okuma süresi hedefi: 20–30 sn)</em></span>
+            <textarea id="f-content" rows="5" placeholder="3–5 kısa cümle. Son cümle 'Kısacası:' ile başlasın."></textarea>
+            <span class="hint">
+              <span id="c-words">0</span> kelime · <span id="c-read">0 sn</span> okuma ·
+              <span id="c-badge" class="badge">—</span>
+            </span>
+          </label>
+
+          <label class="field">
+            <span class="label">🎬 Reels Açıklaması <em>(emojili, satır satır)</em></span>
+            <textarea id="f-reels" rows="6" placeholder="🚓 Üst mü araç mı?&#10;👤 Üst: kişi&#10;🚗 Araç: tüm taşıt&#10;⚖️ Araç araması daha sıkı kurallı"></textarea>
+            <div class="emoji-row" id="emoji-row" aria-label="Emoji ekle"></div>
+          </label>
+
+          <label class="field">
+            <span class="label">#Hashtag'ler</span>
+            <input type="text" id="f-tags" placeholder="#arama #cezahukuku #yalınanlatır #avukat" />
+            <span class="hint">Öneriler:
+              <button type="button" class="chip" data-tag="#hukuk">#hukuk</button>
+              <button type="button" class="chip" data-tag="#yalınanlatır">#yalınanlatır</button>
+              <button type="button" class="chip" data-tag="#avukat">#avukat</button>
+              <button type="button" class="chip" data-tag="#cezahukuku">#cezahukuku</button>
+              <button type="button" class="chip" data-tag="#ailehukuku">#ailehukuku</button>
+              <button type="button" class="chip" data-tag="#işhukuku">#işhukuku</button>
+              <button type="button" class="chip" data-tag="#kvkk">#kvkk</button>
+              <button type="button" class="chip" data-tag="#tutuklama">#tutuklama</button>
+            </span>
+          </label>
+        </div>
+
+        <div class="card preview-card">
+          <div class="card-head">
+            <h2>Önizleme</h2>
+            <div class="head-actions">
+              <button class="btn primary" id="btn-copy">📋 Kopyala</button>
+              <button class="btn" id="btn-save">💾 Arşive Kaydet</button>
+            </div>
+          </div>
+          <pre class="preview" id="preview" aria-live="polite"></pre>
+          <p class="save-hint" id="save-hint"></p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============ ARCHIVE VIEW ============ -->
+    <section class="view" id="view-archive" role="tabpanel" hidden>
+      <div class="archive-toolbar">
+        <input type="search" id="a-search" placeholder="🔎 Arşivde ara (konu, içerik, hashtag)" />
+        <div class="spacer"></div>
+        <button class="btn ghost" id="btn-export">⤓ Dışa Aktar (JSON)</button>
+        <button class="btn ghost" id="btn-import">⤒ İçe Aktar</button>
+        <input type="file" id="file-import" accept="application/json" hidden />
+      </div>
+      <div class="archive-list" id="archive-list"></div>
+      <div class="empty" id="archive-empty" hidden>
+        <div class="empty-art">🗂️</div>
+        <h3>Arşiv boş</h3>
+        <p>Editörde bir video metni oluşturup <b>Arşive Kaydet</b>'e bas.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <template id="archive-card-tpl">
+    <article class="a-card">
+      <header class="a-head">
+        <h3 class="a-title"></h3>
+        <time class="a-date"></time>
+      </header>
+      <p class="a-content"></p>
+      <p class="a-tags"></p>
+      <footer class="a-actions">
+        <button class="btn primary a-copy">📋 Kopyala</button>
+        <button class="btn a-edit">✏️ Düzenle</button>
+        <button class="btn ghost a-del">🗑️ Sil</button>
+      </footer>
+    </article>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
