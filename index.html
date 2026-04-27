@@ -290,6 +290,7 @@
             <button class="btn primary" id="seo-btn-copy-article">📋 Makaleyi Kopyala</button>
             <button class="btn primary" id="seo-btn-copy-meta">🔖 Meta + LSI Kopyala</button>
             <button class="btn" id="seo-btn-save">💾 Arşive Kaydet</button>
+            <button class="btn wp-btn" id="seo-btn-wp" title="WordPress sitenize gönderin">🌐 WordPress'e Gönder</button>
           </div>
         </div><!-- /form-card -->
 
@@ -436,6 +437,39 @@
     </div>
   </div>
 
+  <!-- ============ WORDPRESS PUBLISH MODAL ============ -->
+  <div class="modal" id="modal-wp-publish" hidden aria-hidden="true">
+    <div class="modal-backdrop" data-wp-close></div>
+    <div class="modal-dialog" role="dialog" aria-labelledby="wp-publish-title" aria-modal="true">
+      <header class="modal-head">
+        <h2 id="wp-publish-title">🌐 WordPress'e Gönder</h2>
+        <button class="icon-btn" data-wp-close aria-label="Kapat">✕</button>
+      </header>
+      <div class="modal-body">
+        <div class="wp-preview-box">
+          <span class="seo-meta-label">Gönderilecek Makale</span>
+          <p id="wp-preview-title" class="seo-meta-val" style="margin-top:4px"></p>
+          <p id="wp-preview-site" class="seo-meta-hint" style="margin-top:2px"></p>
+        </div>
+        <label class="field" style="margin-top:12px">
+          <span class="label">Gönderi Durumu</span>
+          <select id="wp-status">
+            <option value="draft">📝 Taslak olarak kaydet</option>
+            <option value="publish">🚀 Hemen Yayınla</option>
+          </select>
+          <span class="hint">Taslak = WordPress panelinden gözden geçirip yayınlarsın.</span>
+        </label>
+        <div class="wp-info-note">
+          ℹ️ Makale başlığı, içerik (HTML'e dönüştürülür) ve meta açıklama gönderilir. Yoast / RankMath kuruluysa odak anahtar kelime de aktarılır.
+        </div>
+      </div>
+      <footer class="modal-foot">
+        <button class="btn ghost" data-wp-close>İptal</button>
+        <button class="btn primary" id="wp-btn-send">🚀 Gönder</button>
+      </footer>
+    </div>
+  </div>
+
   <!-- ============ SETTINGS MODAL ============ -->
   <div class="modal" id="modal-settings" hidden aria-hidden="true">
     <div class="modal-backdrop" data-close></div>
@@ -461,6 +495,26 @@
             <option value="claude-haiku-4-5">claude-haiku-4-5 · en ucuz</option>
           </select>
           <span class="hint">Opus = en kaliteli metin. Haiku = hızlı ve ucuz, günlük üretim için yeterli.</span>
+        </label>
+
+        <div class="settings-sep"><span>🌐 WordPress Bağlantısı</span></div>
+
+        <label class="field">
+          <span class="label">Site URL</span>
+          <input type="url" id="s-wp-url" placeholder="https://siteniz.com" autocomplete="off" />
+          <span class="hint">HTTPS gereklidir. Sonunda / olmadan yazın.</span>
+        </label>
+        <label class="field">
+          <span class="label">Kullanıcı Adı</span>
+          <input type="text" id="s-wp-user" placeholder="admin" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span class="label">Uygulama Şifresi</span>
+          <input type="password" id="s-wp-pass" placeholder="xxxx xxxx xxxx xxxx xxxx xxxx" autocomplete="off" />
+          <span class="hint">
+            WP Yönetici → Kullanıcılar → Profilim → <b>Uygulama Şifreleri</b>'nden oluşturun (WordPress 5.6+).
+            <button type="button" class="btn ghost" id="s-wp-test" style="padding:2px 8px;font-size:11px">🔌 Bağlantıyı Test Et</button>
+          </span>
         </label>
       </div>
       <footer class="modal-foot">
@@ -536,6 +590,7 @@
       <footer class="a-actions">
         <button class="btn primary seo-a-copy-article">📋 Makale</button>
         <button class="btn primary seo-a-copy-meta">🔖 Meta</button>
+        <button class="btn wp-btn seo-a-wp" title="WordPress'e gönder">🌐 WP</button>
         <button class="btn seo-a-regen" title="Makaleyi yapay zeka ile yeniden yaz">🔄 Yeniden Yaz</button>
         <button class="btn seo-a-edit">✏️ Düzenle</button>
         <button class="btn ghost seo-a-del">🗑️</button>

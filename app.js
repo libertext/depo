@@ -7,6 +7,7 @@ const SETTINGS_KEY = 'yalin-anlatir.settings.v1';
 const RESULTS_KEY  = 'yalin-anlatir.results.v1';
 const SEO_STORAGE_KEY = 'seo-writer.articles.v1';
 const SEO_DRAFT_KEY   = 'seo-writer.draft.v1';
+const WP_SETTINGS_KEY = 'seo-writer.wp.v1';
 
 const EMOJIS = ['⚖️','🚓','👮','🧑‍⚖️','📜','📝','🔒','🔓','💼','🏛️','👤','🚗','🚨','⏱️','📞','💰','🏠','👨‍👩‍👧','💍','📄','🚫','✅','❗','❓','💡','🎯'];
 
@@ -494,8 +495,21 @@ const settings = {
         model:  $('#s-model').value,
       };
       this.saveValues(v);
+      wp.saveSettings({
+        url:  $('#s-wp-url').value.trim(),
+        user: $('#s-wp-user').value.trim(),
+        pass: $('#s-wp-pass').value.trim(),
+      });
       this.close();
       toast(v.apiKey ? '⚙️ Ayarlar kaydedildi' : '⚙️ Anahtar boş — üret kullanılmaz');
+    });
+    $('#s-wp-test').addEventListener('click', () => {
+      wp.saveSettings({
+        url:  $('#s-wp-url').value.trim(),
+        user: $('#s-wp-user').value.trim(),
+        pass: $('#s-wp-pass').value.trim(),
+      });
+      wp.testConnection();
     });
   },
 
@@ -503,6 +517,10 @@ const settings = {
     const s = this.load();
     $('#s-api-key').value = s.apiKey;
     $('#s-model').value   = s.model;
+    const wps = wp.loadSettings();
+    $('#s-wp-url').value  = wps.url  || '';
+    $('#s-wp-user').value = wps.user || '';
+    $('#s-wp-pass').value = wps.pass || '';
     this.modal.hidden = false;
     this.modal.setAttribute('aria-hidden', 'false');
     setTimeout(() => $('#s-api-key').focus(), 30);
@@ -1211,6 +1229,7 @@ const seoEditor = {
     $('#seo-btn-copy-meta').addEventListener('click', () => this.copyMeta());
     $('#seo-btn-save').addEventListener('click', () => this.save());
     $('#seo-btn-copy-schema').addEventListener('click', () => this.copySchema());
+    $('#seo-btn-wp').addEventListener('click', () => wpModal.open(this.currentArticle));
 
     $('#seo-toggle-competitor').addEventListener('click', () => {
       const box  = $('#seo-competitor-box');
@@ -1716,6 +1735,7 @@ const seoArchive = {
         } catch { toast('Kopyalanamadı'); }
       });
       node.querySelector('.seo-a-regen').addEventListener('click', () => this.regenerate(it));
+      node.querySelector('.seo-a-wp').addEventListener('click', () => wpModal.open(it));
       node.querySelector('.seo-a-edit').addEventListener('click', () => seoEditor.loadFrom(it));
       node.querySelector('.seo-a-del').addEventListener('click', () => {
         if (!confirm(`"${it.seoTitle || it.topic}" silinsin mi?`)) return;
@@ -1850,6 +1870,136 @@ const seoArchive = {
   },
 };
 
+/* ---------------- WordPress integration ---------------- */
+const wp = {
+  loadSettings() {
+    try { return JSON.parse(localStorage.getItem(WP_SETTINGS_KEY) || '{}'); }
+    catch { return {}; }
+  },
+
+  saveSettings(v) { localStorage.setItem(WP_SETTINGS_KEY, JSON.stringify(v)); },
+
+  getAuthHeader(cfg) {
+    const { user, pass } = cfg;
+    return 'Basic ' + btoa(unescape(encodeURIComponent(user + ':' + pass)));
+  },
+
+  async testConnection() {
+    const cfg = this.loadSettings();
+    if (!cfg.url || !cfg.user || !cfg.pass) {
+      toast('WordPress URL, kullanıcı adı ve uygulama şifresi gerekli');
+      return false;
+    }
+    const base = cfg.url.replace(/\/$/, '');
+    try {
+      const res = await fetch(`${base}/wp-json/wp/v2/users/me`, {
+        headers: { Authorization: this.getAuthHeader(cfg) },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast(`✅ Bağlandı: ${data.name || cfg.user}`);
+        return true;
+      }
+      const err = await res.json().catch(() => ({}));
+      toast(`❌ Hata ${res.status}: ${err.message || res.statusText}`);
+      return false;
+    } catch (e) {
+      toast('❌ Bağlantı hatası: ' + (e.message || 'CORS veya ağ sorunu'));
+      return false;
+    }
+  },
+
+  async createPost({ title, content, excerpt, status }) {
+    const cfg = this.loadSettings();
+    if (!cfg.url || !cfg.user || !cfg.pass) throw new Error('WordPress ayarları eksik');
+    const base = cfg.url.replace(/\/$/, '');
+    const res = await fetch(`${base}/wp-json/wp/v2/posts`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: this.getAuthHeader(cfg),
+      },
+      body: JSON.stringify({ title, content, excerpt, status }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(`WP ${res.status}: ${err.message || res.statusText}`);
+    }
+    return res.json();
+  },
+};
+
+/* ---------------- WordPress publish modal ---------------- */
+const wpModal = {
+  modal: null,
+  currentArticle: null,
+
+  init() {
+    this.modal = $('#modal-wp-publish');
+    this.modal.addEventListener('click', (e) => {
+      if (e.target.matches('[data-wp-close]')) this.close();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (!this.modal.hidden && e.key === 'Escape') this.close();
+    });
+    $('#wp-btn-send').addEventListener('click', () => this.send());
+  },
+
+  open(article) {
+    if (!article) { toast('Önce bir makale seç'); return; }
+    const cfg = wp.loadSettings();
+    if (!cfg.url || !cfg.user || !cfg.pass) {
+      toast('Önce ⚙️ Ayarlar\'dan WordPress bilgilerini gir');
+      settings.open();
+      return;
+    }
+    this.currentArticle = article;
+    $('#wp-preview-title').textContent = article.seoTitle || article.topic || '—';
+    $('#wp-preview-site').textContent   = cfg.url || '';
+    $('#wp-status').value = 'draft';
+    this.modal.hidden = false;
+    this.modal.setAttribute('aria-hidden', 'false');
+  },
+
+  close() {
+    this.modal.hidden = true;
+    this.modal.setAttribute('aria-hidden', 'true');
+    this.currentArticle = null;
+  },
+
+  async send() {
+    const article = this.currentArticle;
+    if (!article) return;
+
+    const btn = $('#wp-btn-send');
+    const origLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Gönderiliyor…';
+
+    const status = $('#wp-status').value;
+    const htmlContent = simpleMarkdown(article.content || '');
+    const excerpt = article.metaDescription || '';
+
+    try {
+      const post = await wp.createPost({
+        title:   article.seoTitle || article.topic || 'SEO Makale',
+        content: htmlContent,
+        excerpt,
+        status,
+      });
+      const label = status === 'publish' ? 'Yayınlandı' : 'Taslak olarak kaydedildi';
+      toast(`✅ ${label}! Post ID: ${post.id}`);
+      this.close();
+    } catch (e) {
+      console.error(e);
+      toast('❌ Gönderilemedi: ' + (e.message || 'hata'));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = origLabel;
+    }
+  },
+};
+
 /* ---------------- Tabs ---------------- */
 const tabs = {
   init() {
@@ -1885,4 +2035,5 @@ document.addEventListener('DOMContentLoaded', () => {
   seoEditor.init();
   seoIdeas.init();
   seoArchive.init();
+  wpModal.init();
 });
