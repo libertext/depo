@@ -1887,24 +1887,25 @@ const wp = {
   async testConnection() {
     const cfg = this.loadSettings();
     if (!cfg.url || !cfg.user || !cfg.pass) {
-      toast('WordPress URL, kullanıcı adı ve uygulama şifresi gerekli');
+      alert('⚠️ Lütfen WordPress URL, kullanıcı adı ve uygulama şifresini doldurun.');
       return false;
     }
     const base = cfg.url.replace(/\/$/, '');
+    const testUrl = `${base}/wp-json/wp/v2/users/me`;
     try {
-      const res = await fetch(`${base}/wp-json/wp/v2/users/me`, {
+      const res = await fetch(testUrl, {
         headers: { Authorization: this.getAuthHeader(cfg) },
       });
       if (res.ok) {
         const data = await res.json();
-        toast(`✅ Bağlandı: ${data.name || cfg.user}`);
+        alert(`✅ Bağlantı başarılı!\nKullanıcı: ${data.name || cfg.user}\nSite: ${base}`);
         return true;
       }
       const err = await res.json().catch(() => ({}));
-      toast(`❌ Hata ${res.status}: ${err.message || res.statusText}`);
+      alert(`❌ Bağlantı başarısız!\nHTTP ${res.status}\nMesaj: ${err.message || res.statusText}\n\nURL: ${testUrl}`);
       return false;
     } catch (e) {
-      toast('❌ Bağlantı hatası: ' + (e.message || 'CORS veya ağ sorunu'));
+      alert(`❌ Bağlantı hatası!\n\n${e.message}\n\nOlası sebepler:\n• REST API kapalı (Perfmatters kontrol edin)\n• CORS engeli\n• URL yanlış\n\nURL: ${testUrl}`);
       return false;
     }
   },
