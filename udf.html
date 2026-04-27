@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1220" />
+  <title>UDF → PDF Dönüştürücü</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='52' font-size='52'%3E📄%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="udf-styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">📄</span>
+      <div class="brand-text">
+        <h1>UDF → PDF</h1>
+        <p>Toplu UDF Dönüştürücü</p>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="icon-btn" id="btn-settings" title="Sayfa ayarları">⚙️</button>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- Drop Zone -->
+    <div class="drop-zone" id="drop-zone" tabindex="0" role="button"
+         aria-label="UDF dosyası yüklemek için tıkla veya sürükle bırak">
+      <div class="drop-icon">📂</div>
+      <h2>UDF Dosyalarını Buraya Bırak</h2>
+      <p class="drop-sub">ya da aşağıdaki düğmeye tıkla — çoklu seçim desteklenir</p>
+      <button class="btn primary" id="btn-browse" type="button">Dosya Seç (.udf)</button>
+      <input type="file" id="file-input" accept=".udf,.UDF" multiple hidden />
+    </div>
+
+    <!-- Controls bar -->
+    <div class="controls-bar" id="controls-bar" hidden>
+      <span class="file-count" id="file-count">0 dosya</span>
+      <div class="controls-actions">
+        <button class="btn ghost" id="btn-add-more" type="button">➕ Dosya Ekle</button>
+        <button class="btn ghost" id="btn-clear-all" type="button">🗑️ Temizle</button>
+        <button class="btn primary" id="btn-convert-all" type="button">⚡ Hepsini Dönüştür</button>
+        <button class="btn" id="btn-download-zip" type="button" disabled>📦 ZIP İndir</button>
+      </div>
+    </div>
+
+    <!-- File list -->
+    <div class="file-list" id="file-list"></div>
+
+    <!-- Empty placeholder shown while list is empty after first use -->
+    <div class="empty" id="list-empty" hidden>
+      <div class="empty-art">📭</div>
+      <h3>Liste boş</h3>
+      <p>Yeni UDF dosyaları yükle.</p>
+    </div>
+
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- Preview / PDF Modal -->
+  <div class="modal" id="modal-preview" hidden aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-dialog preview-dialog" role="dialog" aria-labelledby="preview-title" aria-modal="true">
+      <header class="modal-head">
+        <h2 id="preview-title">Önizleme</h2>
+        <div class="head-actions">
+          <button class="btn primary" id="btn-dl-single" type="button">⬇️ PDF İndir</button>
+          <button class="btn ghost" id="btn-print-single" type="button">🖨️ Yazdır</button>
+          <button class="icon-btn" data-close aria-label="Kapat">✕</button>
+        </div>
+      </header>
+      <div class="preview-body" id="preview-content"></div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal" id="modal-settings" hidden aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-dialog" role="dialog" aria-labelledby="settings-title" aria-modal="true">
+      <header class="modal-head">
+        <h2 id="settings-title">⚙️ Sayfa Ayarları</h2>
+        <button class="icon-btn" data-close aria-label="Kapat">✕</button>
+      </header>
+      <div class="modal-body">
+        <label class="field">
+          <span class="label">Kağıt boyutu</span>
+          <select id="s-format">
+            <option value="a4" selected>A4</option>
+            <option value="a3">A3</option>
+            <option value="letter">Letter</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Yönelim</span>
+          <select id="s-orient">
+            <option value="portrait" selected>Dikey (Portrait)</option>
+            <option value="landscape">Yatay (Landscape)</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Kenar boşluğu (mm)</span>
+          <input type="number" id="s-margin" value="15" min="0" max="50" step="1" />
+        </label>
+        <label class="field">
+          <span class="label">Yazı boyutu</span>
+          <select id="s-fontsize">
+            <option value="10pt">10pt</option>
+            <option value="11pt">11pt</option>
+            <option value="12pt" selected>12pt</option>
+            <option value="13pt">13pt</option>
+            <option value="14pt">14pt</option>
+          </select>
+        </label>
+      </div>
+      <footer class="modal-foot">
+        <button class="btn ghost" data-close>İptal</button>
+        <button class="btn primary" id="s-save">💾 Kaydet</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- File card template -->
+  <template id="file-card-tpl">
+    <article class="file-card" data-id="">
+      <div class="fc-icon">📄</div>
+      <div class="fc-info">
+        <span class="fc-name"></span>
+        <span class="fc-size"></span>
+      </div>
+      <span class="fc-status badge"></span>
+      <div class="fc-actions">
+        <button class="btn ghost fc-preview" title="Önizle" type="button">👁️</button>
+        <button class="btn primary fc-download" title="PDF indir" type="button" disabled>⬇️ PDF</button>
+        <button class="btn ghost fc-remove" title="Listeden çıkar" type="button">🗑️</button>
+      </div>
+    </article>
+  </template>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
+          integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg=="
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="udf-app.js"></script>
+</body>
+</html>
