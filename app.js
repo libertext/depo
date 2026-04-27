@@ -571,10 +571,10 @@ HUKUKİ DOĞRULUK:
 Sadece aracı çağır, başka metin üretme.`;
 
 const ai = {
-  async _call({ system, tool, userMessage, s }) {
+  async _call({ system, tool, userMessage, s, maxTokens = 1024 }) {
     const body = {
       model: s.model || 'claude-opus-4-7',
-      max_tokens: 1024,
+      max_tokens: maxTokens,
       system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
       tools: [tool],
       tool_choice: { type: 'tool', name: tool.name },
@@ -1060,6 +1060,7 @@ ai.generateSeoArticle = function({ topic, category, keyword, tone, length }, s) 
     },
     userMessage: `Konu: ${topic}\nKategori: ${category}\nOdak anahtar kelime: ${keyword || 'Otomatik belirle'}\nTon: ${tone}\nUzunluk hedefi: ${lengthDesc}\n\nBu parametrelerle tam SEO makalesi üret.`,
     s,
+    maxTokens: 4096,
   });
 };
 
