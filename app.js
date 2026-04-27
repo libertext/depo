@@ -1884,10 +1884,23 @@ const wp = {
     return 'Basic ' + btoa(unescape(encodeURIComponent(user + ':' + pass)));
   },
 
+  showTestResult(ok, msg) {
+    const el = $('#s-wp-result');
+    if (!el) return;
+    el.style.display = 'block';
+    el.style.background = ok ? 'rgba(34,197,94,.15)' : 'rgba(239,68,68,.15)';
+    el.style.color = ok ? '#16a34a' : '#dc2626';
+    el.style.border = `1px solid ${ok ? '#86efac' : '#fca5a5'}`;
+    el.textContent = msg;
+  },
+
   async testConnection() {
     const cfg = this.loadSettings();
+    const resultEl = $('#s-wp-result');
+    if (resultEl) { resultEl.style.display = 'block'; resultEl.textContent = '⏳ Test ediliyor…'; resultEl.style.background = 'rgba(100,116,139,.1)'; resultEl.style.color = 'var(--text-dim)'; resultEl.style.border = '1px solid var(--border)'; }
+
     if (!cfg.url || !cfg.user || !cfg.pass) {
-      alert('⚠️ Lütfen WordPress URL, kullanıcı adı ve uygulama şifresini doldurun.');
+      this.showTestResult(false, '⚠️ URL, kullanıcı adı ve uygulama şifresini doldurun.');
       return false;
     }
     const base = cfg.url.replace(/\/$/, '');
@@ -1898,14 +1911,19 @@ const wp = {
       });
       if (res.ok) {
         const data = await res.json();
-        alert(`✅ Bağlantı başarılı!\nKullanıcı: ${data.name || cfg.user}\nSite: ${base}`);
+        this.showTestResult(true, `✅ Bağlandı! Kullanıcı: ${data.name || cfg.user}`);
         return true;
       }
       const err = await res.json().catch(() => ({}));
-      alert(`❌ Bağlantı başarısız!\nHTTP ${res.status}\nMesaj: ${err.message || res.statusText}\n\nURL: ${testUrl}`);
+      this.showTestResult(false, `❌ HTTP ${res.status}: ${err.message || res.statusText}`);
       return false;
     } catch (e) {
-      alert(`❌ Bağlantı hatası!\n\n${e.message}\n\nOlası sebepler:\n• REST API kapalı (Perfmatters kontrol edin)\n• CORS engeli\n• URL yanlış\n\nURL: ${testUrl}`);
+      const msg = e.message || '';
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+        this.showTestResult(false, '❌ CORS/ağ hatası — REST API kapalı veya CORS izni yok. Perfmatters ayarını kontrol edin.');
+      } else {
+        this.showTestResult(false, '❌ ' + msg);
+      }
       return false;
     }
   },
