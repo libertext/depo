@@ -4,6 +4,7 @@
 const STORAGE_KEY  = 'yalin-anlatir.archive.v1';
 const DRAFT_KEY    = 'yalin-anlatir.draft.v1';
 const SETTINGS_KEY = 'yalin-anlatir.settings.v1';
+const RESULTS_KEY  = 'yalin-anlatir.results.v1';
 
 const EMOJIS = ['⚖️','🚓','👮','🧑‍⚖️','📜','📝','🔒','🔓','💼','🏛️','👤','🚗','🚨','⏱️','📞','💰','🏠','👨‍👩‍👧','💍','📄','🚫','✅','❗','❓','💡','🎯'];
 
@@ -83,6 +84,18 @@ function buildOutput({ topic, content, reels, tags }) {
   return parts.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd();
 }
 
+/* "Konu + içerik" — etiketsiz, sadece başlık ve içerik metni */
+function buildTopicContent({ topic, content }) {
+  return [(topic || '').trim(), '', (content || '').trim()]
+    .join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/* "Reels açıklaması" — etiketsiz, sadece emojili blok + hashtag */
+function buildReelsCaption({ reels, tags }) {
+  return [(reels || '').trim(), '', (tags || '').trim()]
+    .join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 /* ---------------- Editor state ---------------- */
 const editor = {
   els: {},
@@ -132,6 +145,8 @@ const editor = {
 
     // buttons
     $('#btn-copy').addEventListener('click', () => this.copy());
+    $('#btn-copy-tc').addEventListener('click', () => this.copyTopicContent());
+    $('#btn-copy-reels').addEventListener('click', () => this.copyReels());
     $('#btn-save').addEventListener('click', () => this.save());
     $('#btn-clear').addEventListener('click', () => this.clear());
     $('#btn-sample').addEventListener('click', () => this.loadSample());
@@ -218,7 +233,25 @@ const editor = {
     if (!d.topic && !d.content) { toast('Önce içerik gir'); return; }
     try {
       await copyText(buildOutput(d));
-      toast('📋 Kopyalandı');
+      toast('📋 Tümü kopyalandı');
+    } catch { toast('Kopyalanamadı'); }
+  },
+
+  async copyTopicContent() {
+    const d = this.getData();
+    if (!d.topic && !d.content) { toast('Konu/içerik boş'); return; }
+    try {
+      await copyText(buildTopicContent(d));
+      toast('📝 Konu + İçerik kopyalandı');
+    } catch { toast('Kopyalanamadı'); }
+  },
+
+  async copyReels() {
+    const d = this.getData();
+    if (!d.reels && !d.tags) { toast('Reels/hashtag boş'); return; }
+    try {
+      await copyText(buildReelsCaption(d));
+      toast('🎬 Reels açıklaması kopyalandı');
     } catch { toast('Kopyalanamadı'); }
   },
 
@@ -349,8 +382,16 @@ const archive = {
       node.querySelector('.a-content').textContent = it.content;
       node.querySelector('.a-tags').textContent = it.tags || '';
 
+      node.querySelector('.a-copy-tc').addEventListener('click', async () => {
+        try { await copyText(buildTopicContent(it)); toast('📝 Konu + İçerik kopyalandı'); }
+        catch { toast('Kopyalanamadı'); }
+      });
+      node.querySelector('.a-copy-reels').addEventListener('click', async () => {
+        try { await copyText(buildReelsCaption(it)); toast('🎬 Reels kopyalandı'); }
+        catch { toast('Kopyalanamadı'); }
+      });
       node.querySelector('.a-copy').addEventListener('click', async () => {
-        try { await copyText(buildOutput(it)); toast('📋 Kopyalandı'); }
+        try { await copyText(buildOutput(it)); toast('📋 Tümü kopyalandı'); }
         catch { toast('Kopyalanamadı'); }
       });
       node.querySelector('.a-edit').addEventListener('click', () => editor.editFrom(it));
@@ -639,16 +680,41 @@ const AREA_LABELS = {
 
 const ideas = {
   modal: null,
+  pool: [], // {topic, checked}
 
   init() {
     this.modal = $('#modal-ideas');
     $('#btn-ideas').addEventListener('click', () => this.open());
-    $('#i-gen').addEventListener('click', () => this.suggest());
+    $('#i-gen').addEventListener('click', () => this.suggest(false));
+    $('#i-add-more').addEventListener('click', () => this.suggest(true));
+    $('#i-build').addEventListener('click', () => this.buildSelected());
+
+    $('#i-select-all').addEventListener('change', (e) => {
+      const on = e.target.checked;
+      this.pool.forEach(p => p.checked = on);
+      this.renderList();
+    });
 
     this.modal.addEventListener('click', (e) => {
       if (e.target.matches('[data-close]')) { this.close(); return; }
+      const pickBtn = e.target.closest('.idea-pick');
+      if (pickBtn) {
+        e.preventDefault();
+        this.pickToEditor(pickBtn.dataset.topic);
+        return;
+      }
       const item = e.target.closest('.idea-item');
-      if (item) this.pick(item.dataset.topic);
+      if (item && !e.target.matches('input[type="checkbox"]')) {
+        const cb = item.querySelector('input[type="checkbox"]');
+        if (cb) {
+          cb.checked = !cb.checked;
+          this.onToggle(cb);
+        }
+      }
+    });
+
+    this.modal.addEventListener('change', (e) => {
+      if (e.target.matches('.idea-check')) this.onToggle(e.target);
     });
 
     document.addEventListener('keydown', (e) => {
@@ -667,38 +733,63 @@ const ideas = {
     this.modal.setAttribute('aria-hidden', 'true');
   },
 
-  pick(topic) {
+  pickToEditor(topic) {
     if (!topic) return;
     editor.editingId = null;
     editor.els.topic.value = topic;
     editor.render();
     editor.saveDraft();
     this.close();
+    tabs.show('editor');
     editor.els.topic.focus();
-    toast('💡 Başlık eklendi — ⚡ Üret\'e bas');
+    toast('💡 Başlık editöre yapıştı — ⚡ Üret\'e bas');
   },
 
-  renderList(topics) {
+  onToggle(cb) {
+    const topic = cb.dataset.topic;
+    const item = this.pool.find(p => p.topic === topic);
+    if (item) item.checked = cb.checked;
+    cb.closest('.idea-item')?.classList.toggle('is-checked', cb.checked);
+    this.updateFooter();
+  },
+
+  updateFooter() {
+    const sel = this.pool.filter(p => p.checked).length;
+    const total = this.pool.length;
+    $('#i-count').textContent = `${sel} seçili / ${total}`;
+    $('#i-build').disabled = sel === 0;
+    const all = $('#i-select-all');
+    all.checked = total > 0 && sel === total;
+    all.indeterminate = sel > 0 && sel < total;
+    $('#ideas-foot').hidden = total === 0;
+  },
+
+  renderList() {
     const list = $('#ideas-list');
     const empty = $('#ideas-empty');
     list.innerHTML = '';
-    if (!topics.length) {
+    if (!this.pool.length) {
       empty.classList.remove('is-hidden');
-      empty.textContent = 'Başlık üretilemedi. Tekrar dene.';
+      empty.textContent = 'Henüz öneri yok. ⚡ Başlık Öner\'e bas.';
+      this.updateFooter();
       return;
     }
     empty.classList.add('is-hidden');
-    topics.forEach(t => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'idea-item';
-      b.dataset.topic = t;
-      b.textContent = t;
-      list.appendChild(b);
+    this.pool.forEach(p => {
+      const row = document.createElement('label');
+      row.className = 'idea-item' + (p.checked ? ' is-checked' : '');
+      row.innerHTML = `
+        <input type="checkbox" class="idea-check" data-topic="${escAttr(p.topic)}" ${p.checked ? 'checked' : ''} />
+        <span class="idea-text"></span>
+        <button type="button" class="idea-pick" data-topic="${escAttr(p.topic)}" title="Sadece bunu editöre at">→ Editör</button>
+      `;
+      row.querySelector('.idea-text').textContent = p.topic;
+      list.appendChild(row);
     });
+    this.updateFooter();
   },
 
-  async suggest() {
+  async suggest(append) {
     const s = settings.load();
     if (!s.apiKey) {
       toast('Önce ⚙️ Ayarlar\'dan API anahtarı gir');
@@ -708,14 +799,20 @@ const ideas = {
     }
     const area = $('#i-area').value;
     const label = AREA_LABELS[area] || area;
-    const btn = $('#i-gen');
+    const btn = append ? $('#i-add-more') : $('#i-gen');
     const origLabel = btn.textContent;
     btn.disabled = true;
     btn.classList.add('is-loading');
     btn.textContent = '⏳ Öneriliyor';
     try {
       const topics = await ai.suggestTopics(label, s);
-      this.renderList(topics);
+      const newOnes = topics
+        .map(t => t.trim())
+        .filter(t => t && !this.pool.some(p => p.topic === t));
+      if (!append) this.pool = [];
+      newOnes.forEach(t => this.pool.push({ topic: t, checked: false }));
+      this.renderList();
+      if (!newOnes.length) toast('Yeni başlık üretilemedi');
     } catch (e) {
       console.error(e);
       toast('Öneri başarısız: ' + (e.message || 'hata'));
@@ -724,6 +821,166 @@ const ideas = {
       btn.classList.remove('is-loading');
       btn.textContent = origLabel;
     }
+  },
+
+  async buildSelected() {
+    const s = settings.load();
+    if (!s.apiKey) {
+      toast('Önce ⚙️ Ayarlar\'dan API anahtarı gir');
+      this.close();
+      settings.open();
+      return;
+    }
+    const selected = this.pool.filter(p => p.checked).map(p => p.topic);
+    if (!selected.length) { toast('En az 1 başlık seç'); return; }
+
+    const btn = $('#i-build');
+    const origLabel = btn.textContent;
+    btn.disabled = true;
+    btn.classList.add('is-loading');
+
+    let ok = 0, fail = 0;
+    for (let i = 0; i < selected.length; i++) {
+      btn.textContent = `⏳ ${i + 1}/${selected.length} üretiliyor`;
+      try {
+        const out = await ai.generate(selected[i], s);
+        results.add({
+          id: newId(),
+          topic: selected[i],
+          content: out.content || '',
+          reels:   out.reels   || '',
+          tags:    out.tags    || '',
+          createdAt: Date.now(),
+        });
+        ok++;
+      } catch (e) {
+        console.error('build failed:', selected[i], e);
+        fail++;
+      }
+    }
+
+    btn.disabled = false;
+    btn.classList.remove('is-loading');
+    btn.textContent = origLabel;
+
+    // Üretilenleri havuzdan çıkar (kullanıcı tekrar seçmesin)
+    this.pool = this.pool.filter(p => !p.checked);
+    this.renderList();
+    this.close();
+
+    tabs.show('results');
+    if (fail === 0) toast(`✨ ${ok} sonuç üretildi`);
+    else toast(`✨ ${ok} başarılı · ${fail} hata`);
+  },
+};
+
+/* ---------------- Results (toplu üretim çıktıları) ---------------- */
+function escAttr(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+const results = {
+  list() {
+    try { return JSON.parse(localStorage.getItem(RESULTS_KEY) || '[]'); }
+    catch { return []; }
+  },
+  saveAll(items) { localStorage.setItem(RESULTS_KEY, JSON.stringify(items)); },
+  add(item) {
+    const items = this.list();
+    items.unshift(item);
+    this.saveAll(items);
+    this.refresh();
+  },
+  remove(id) {
+    this.saveAll(this.list().filter(x => x.id !== id));
+    this.refresh();
+  },
+  clearAll() {
+    this.saveAll([]);
+    this.refresh();
+  },
+
+  init() {
+    $('#btn-results-clear').addEventListener('click', () => {
+      if (!this.list().length) { toast('Liste zaten boş'); return; }
+      if (!confirm('Tüm üretilen sonuçlar silinsin mi?')) return;
+      this.clearAll();
+      toast('🧹 Sonuçlar temizlendi');
+    });
+    $('#btn-results-archive-all').addEventListener('click', () => this.archiveAll());
+    this.refresh();
+  },
+
+  refresh() {
+    const items = this.list();
+    $('#resultsCount').textContent = items.length;
+
+    const list = $('#results-list');
+    const empty = $('#results-empty');
+    list.innerHTML = '';
+
+    if (!items.length) {
+      empty.hidden = false;
+      return;
+    }
+    empty.hidden = true;
+
+    const tpl = $('#result-card-tpl');
+    items.forEach(it => {
+      const node = tpl.content.firstElementChild.cloneNode(true);
+      node.querySelector('.r-title').textContent = it.topic;
+      node.querySelector('.r-date').textContent  = fmtDate(it.createdAt);
+      node.querySelector('.r-content').textContent = it.content;
+      node.querySelector('.r-reels').textContent = it.reels;
+      node.querySelector('.r-tags').textContent = it.tags || '';
+
+      node.querySelector('.r-copy-tc').addEventListener('click', async () => {
+        try { await copyText(buildTopicContent(it)); toast('📝 Konu + İçerik kopyalandı'); }
+        catch { toast('Kopyalanamadı'); }
+      });
+      node.querySelector('.r-copy-reels').addEventListener('click', async () => {
+        try { await copyText(buildReelsCaption(it)); toast('🎬 Reels kopyalandı'); }
+        catch { toast('Kopyalanamadı'); }
+      });
+      node.querySelector('.r-edit').addEventListener('click', () => {
+        editor.editingId = null;
+        editor.setData(it);
+        editor.saveDraft();
+        tabs.show('editor');
+      });
+      node.querySelector('.r-save').addEventListener('click', () => {
+        const now = Date.now();
+        db.add({
+          id: newId(),
+          topic: it.topic, content: it.content,
+          reels: it.reels, tags: it.tags,
+          createdAt: now, updatedAt: now,
+        });
+        archive.refresh();
+        toast('💾 Arşive eklendi');
+      });
+      node.querySelector('.r-del').addEventListener('click', () => {
+        if (!confirm('Bu sonuç silinsin mi?')) return;
+        this.remove(it.id);
+      });
+      list.appendChild(node);
+    });
+  },
+
+  archiveAll() {
+    const items = this.list();
+    if (!items.length) { toast('Liste boş'); return; }
+    const now = Date.now();
+    items.forEach(it => {
+      db.add({
+        id: newId(),
+        topic: it.topic, content: it.content,
+        reels: it.reels, tags: it.tags,
+        createdAt: now, updatedAt: now,
+      });
+    });
+    archive.refresh();
+    toast(`💾 ${items.length} sonuç arşive eklendi`);
   },
 };
 
@@ -746,6 +1003,7 @@ const tabs = {
       v.hidden = !active;
     });
     if (name === 'archive') archive.refresh();
+    if (name === 'results') results.refresh();
   }
 };
 
@@ -754,6 +1012,7 @@ document.addEventListener('DOMContentLoaded', () => {
   tabs.init();
   editor.init();
   archive.init();
+  results.init();
   settings.init();
   ideas.init();
 });

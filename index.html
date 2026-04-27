@@ -19,6 +19,9 @@
     </div>
     <nav class="tabs" role="tablist">
       <button class="tab is-active" data-tab="editor" role="tab" aria-selected="true">✍️ Yeni</button>
+      <button class="tab" data-tab="results" role="tab" aria-selected="false">
+        📦 Sonuçlar <span class="count" id="resultsCount">0</span>
+      </button>
       <button class="tab" data-tab="archive" role="tab" aria-selected="false">
         🗂️ Arşiv <span class="count" id="archiveCount">0</span>
       </button>
@@ -86,14 +89,32 @@
           <div class="card-head">
             <h2>Önizleme</h2>
             <div class="head-actions">
-              <button class="btn primary" id="btn-copy">📋 Kopyala</button>
-              <button class="btn" id="btn-save">💾 Arşive Kaydet</button>
+              <button class="btn primary" id="btn-copy-tc" title="Sadece konu başlığı + içerik (etiketsiz)">📝 Konu+İçerik</button>
+              <button class="btn primary" id="btn-copy-reels" title="Sadece reels açıklaması + hashtag (etiketsiz)">🎬 Reels</button>
+              <button class="btn" id="btn-copy" title="Tam şablon (etiketli)">📋 Tümü</button>
+              <button class="btn" id="btn-save">💾 Arşive</button>
             </div>
           </div>
           <pre class="preview" id="preview" aria-live="polite"></pre>
           <p class="save-hint" id="save-hint"></p>
         </div>
 
+      </div>
+    </section>
+
+    <!-- ============ RESULTS VIEW (toplu üretim) ============ -->
+    <section class="view" id="view-results" role="tabpanel" hidden>
+      <div class="archive-toolbar">
+        <h2 class="view-title">📦 Üretilen Sonuçlar</h2>
+        <div class="spacer"></div>
+        <button class="btn ghost" id="btn-results-archive-all" title="Hepsini arşive kaydet">💾 Hepsini Arşivle</button>
+        <button class="btn ghost" id="btn-results-clear" title="Sonuçlar listesini temizle">🧹 Tümünü Sil</button>
+      </div>
+      <div class="results-list" id="results-list"></div>
+      <div class="empty" id="results-empty" hidden>
+        <div class="empty-art">📦</div>
+        <h3>Henüz üretilen sonuç yok</h3>
+        <p>💡 <b>Fikir Öner</b>'i aç → alan seç → ⚡ Başlık Öner → çoklu seç → ✨ <b>Seçilenleri Üret</b>'e bas.</p>
       </div>
     </section>
 
@@ -118,37 +139,51 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <!-- ============ IDEAS MODAL ============ -->
+  <!-- ============ IDEAS MODAL (havuz + çoklu seçim) ============ -->
   <div class="modal" id="modal-ideas" hidden aria-hidden="true">
     <div class="modal-backdrop" data-close></div>
-    <div class="modal-dialog" role="dialog" aria-labelledby="ideas-title" aria-modal="true">
+    <div class="modal-dialog wide" role="dialog" aria-labelledby="ideas-title" aria-modal="true">
       <header class="modal-head">
-        <h2 id="ideas-title">💡 Fikir Öner</h2>
+        <h2 id="ideas-title">💡 Fikir Havuzu</h2>
         <button class="icon-btn" data-close aria-label="Kapat">✕</button>
       </header>
       <div class="modal-body">
-        <label class="field">
-          <span class="label">Hukuk Alanı</span>
-          <select id="i-area">
-            <option value="karisik">Karışık (farklı alanlardan)</option>
-            <option value="aile">Aile Hukuku</option>
-            <option value="ceza">Ceza Hukuku</option>
-            <option value="is">İş Hukuku</option>
-            <option value="tazminat">Tazminat Hukuku</option>
-            <option value="kira">Kira / Gayrimenkul</option>
-            <option value="tuketici">Tüketici Hukuku</option>
-            <option value="miras">Miras Hukuku</option>
-            <option value="kvkk">KVKK / Dijital</option>
-            <option value="borclar">Borçlar / Sözleşmeler</option>
-          </select>
-          <span class="hint">Alan seç → ⚡ Başlık Öner → bir başlığa tıkla, Konu'ya yapışır.</span>
-        </label>
-        <div class="ideas-actions">
-          <button class="btn primary" id="i-gen">⚡ Başlık Öner</button>
+        <div class="ideas-row">
+          <label class="field" style="flex:1 1 220px; margin:0;">
+            <span class="label">Hukuk Alanı</span>
+            <select id="i-area">
+              <option value="karisik">Karışık (farklı alanlardan)</option>
+              <option value="aile">Aile Hukuku</option>
+              <option value="ceza">Ceza Hukuku</option>
+              <option value="is">İş Hukuku</option>
+              <option value="tazminat">Tazminat Hukuku</option>
+              <option value="kira">Kira / Gayrimenkul</option>
+              <option value="tuketici">Tüketici Hukuku</option>
+              <option value="miras">Miras Hukuku</option>
+              <option value="kvkk">KVKK / Dijital</option>
+              <option value="borclar">Borçlar / Sözleşmeler</option>
+            </select>
+          </label>
+          <button class="btn primary" id="i-gen" title="Bu alandan 6-8 başlık öner">⚡ Başlık Öner</button>
+          <button class="btn ghost" id="i-add-more" title="Mevcut listeye yeni öneriler ekle">➕ Daha Öner</button>
         </div>
+
+        <p class="hint">
+          Önerilenleri işaretle (çoklu seçim), sonra ✨ <b>Seçilenleri Üret</b>'e bas. Her seçim sırayla üretilir, <b>📦 Sonuçlar</b> sekmesinde görünür.
+        </p>
+
         <div class="ideas-list" id="ideas-list"></div>
         <p class="ideas-empty" id="ideas-empty">Henüz öneri yok. ⚡ Başlık Öner'e bas.</p>
       </div>
+      <footer class="modal-foot ideas-foot" id="ideas-foot" hidden>
+        <label class="check-row">
+          <input type="checkbox" id="i-select-all" />
+          <span>Tümünü seç</span>
+        </label>
+        <span class="ideas-count" id="i-count">0 seçili</span>
+        <div class="spacer"></div>
+        <button class="btn primary" id="i-build" disabled>✨ Seçilenleri Üret</button>
+      </footer>
     </div>
   </div>
 
@@ -195,9 +230,36 @@
       <p class="a-content"></p>
       <p class="a-tags"></p>
       <footer class="a-actions">
-        <button class="btn primary a-copy">📋 Kopyala</button>
+        <button class="btn primary a-copy-tc" title="Konu + İçerik (etiketsiz)">📝 Konu+İçerik</button>
+        <button class="btn primary a-copy-reels" title="Reels açıklaması + hashtag (etiketsiz)">🎬 Reels</button>
+        <button class="btn a-copy" title="Tam şablon (etiketli)">📋 Tümü</button>
         <button class="btn a-edit">✏️ Düzenle</button>
-        <button class="btn ghost a-del">🗑️ Sil</button>
+        <button class="btn ghost a-del">🗑️</button>
+      </footer>
+    </article>
+  </template>
+
+  <template id="result-card-tpl">
+    <article class="r-card">
+      <header class="r-head">
+        <h3 class="r-title"></h3>
+        <time class="r-date"></time>
+      </header>
+      <div class="r-block">
+        <span class="r-label">Konu + İçerik <em>(etiketsiz kopyalanır)</em></span>
+        <p class="r-content"></p>
+      </div>
+      <div class="r-block">
+        <span class="r-label">🎬 Reels Açıklaması <em>(etiketsiz kopyalanır)</em></span>
+        <pre class="r-reels"></pre>
+        <p class="r-tags"></p>
+      </div>
+      <footer class="r-actions">
+        <button class="btn primary r-copy-tc">📝 Konu+İçerik</button>
+        <button class="btn primary r-copy-reels">🎬 Reels</button>
+        <button class="btn r-edit" title="Editöre yükle">✏️ Editöre At</button>
+        <button class="btn r-save" title="Arşive kaydet">💾 Arşivle</button>
+        <button class="btn ghost r-del" title="Listeden sil">🗑️</button>
       </footer>
     </article>
   </template>

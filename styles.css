@@ -459,38 +459,66 @@ input[type="search"]#a-search:focus {
 }
 .field input[type="password"] { letter-spacing: .5px; }
 
-/* ===== Ideas list ===== */
-.ideas-actions {
+/* ===== Ideas pool (multi-select) ===== */
+.modal-dialog.wide { width: min(620px, 100%); }
+.ideas-row {
   display: flex;
-  justify-content: flex-end;
-  margin: 4px 0 12px;
+  gap: 8px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
 }
 .ideas-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 340px;
+  max-height: 360px;
   overflow-y: auto;
+  margin-top: 4px;
 }
 .ideas-list:empty { display: none; }
 .idea-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   background: var(--bg-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 10px 12px;
   color: var(--text);
   font-size: 13.5px;
-  text-align: left;
   cursor: pointer;
   font-family: inherit;
   transition: .15s;
   line-height: 1.4;
+  user-select: none;
 }
-.idea-item:hover {
+.idea-item:hover { border-color: var(--accent); }
+.idea-item input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 18px; height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  margin: 0;
+}
+.idea-item.is-checked {
   border-color: var(--accent);
-  color: var(--accent-2);
-  transform: translateX(2px);
+  background: rgba(212, 162, 74, .08);
 }
+.idea-item.is-checked .idea-text { color: var(--accent-2); }
+.idea-text { flex: 1 1 auto; }
+.idea-pick {
+  flex: 0 0 auto;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 11.5px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.idea-pick:hover { color: var(--text); border-color: var(--accent); }
 .ideas-empty {
   margin: 0;
   color: var(--muted);
@@ -499,6 +527,92 @@ input[type="search"]#a-search:focus {
   text-align: center;
 }
 .ideas-empty.is-hidden { display: none; }
+.ideas-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.check-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+}
+.check-row input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+.ideas-count {
+  font-size: 12px;
+  color: var(--accent-2);
+  font-weight: 600;
+}
+
+/* ===== Results view ===== */
+.view-title { margin: 0; font-size: 16px; }
+.results-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+.r-card {
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex; flex-direction: column; gap: 12px;
+  box-shadow: var(--shadow);
+  transition: .15s;
+}
+.r-card:hover { border-color: var(--border-strong); }
+.r-head {
+  display: flex; justify-content: space-between; gap: 10px; align-items: start;
+}
+.r-title { margin: 0; font-size: 15px; line-height: 1.35; color: var(--accent-2); }
+.r-date { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.r-block { display: flex; flex-direction: column; gap: 4px; }
+.r-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.r-label em { font-style: normal; color: var(--muted); text-transform: none; letter-spacing: 0; }
+.r-content {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.55;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+}
+.r-reels {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  color: var(--text);
+}
+.r-tags {
+  margin: 0;
+  color: var(--accent-2);
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-word;
+}
+.r-actions {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto;
+}
+.r-actions .btn { padding: 7px 11px; font-size: 12.5px; }
 
 /* ===== Responsive tweaks ===== */
 @media (max-width: 560px) {
