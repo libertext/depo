@@ -1991,8 +1991,13 @@ const wpModal = {
       toast(`✅ ${label}! Post ID: ${post.id}`);
       this.close();
     } catch (e) {
-      console.error(e);
-      toast('❌ Gönderilemedi: ' + (e.message || 'hata'));
+      console.error('WP Publish error:', e);
+      let msg = e.message || 'bilinmeyen hata';
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('CORS')) {
+        msg = 'CORS/ağ hatası — F12 konsoluna bakın';
+      }
+      toast('❌ Gönderilemedi: ' + msg);
+      alert('WordPress Hata Detayı:\n\n' + e.message + '\n\nTarayıcı konsolunda (F12) daha fazla bilgi var.');
     } finally {
       btn.disabled = false;
       btn.textContent = origLabel;
