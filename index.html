@@ -207,38 +207,91 @@
             </label>
           </div>
 
-          <!-- SEO Meta Box (hidden until generation) -->
+          <!-- Competitor content (collapsible) -->
+          <div class="seo-toggle-row">
+            <button type="button" class="btn ghost seo-toggle-btn" id="seo-toggle-competitor">
+              <span id="seo-competitor-icon">▶</span> Rakip İçerik Ekle
+              <em class="seo-toggle-hint">opsiyonel — AI bunu referans alarak daha kapsamlı yazar</em>
+            </button>
+          </div>
+          <div class="seo-collapsible" id="seo-competitor-box" hidden>
+            <label class="field" style="margin:0">
+              <textarea id="seo-competitor" rows="3" placeholder="Rakip sitenin URL'sini, başlıklarını veya içerik notlarını yapıştır…"></textarea>
+            </label>
+          </div>
+
+          <!-- SEO Meta Box (appears after generation) -->
           <div class="seo-meta-box" id="seo-meta-box" hidden>
+
             <div class="seo-meta-item">
               <span class="seo-meta-label">SEO Başlık</span>
               <p class="seo-meta-val" id="seo-meta-title"></p>
               <span class="seo-meta-hint" id="seo-meta-title-len"></span>
             </div>
+
             <div class="seo-meta-item">
               <span class="seo-meta-label">Meta Açıklama</span>
               <p class="seo-meta-val" id="seo-meta-desc"></p>
               <span class="seo-meta-hint" id="seo-meta-desc-len"></span>
             </div>
+
             <div class="seo-meta-item">
               <span class="seo-meta-label">Odak Anahtar Kelime</span>
               <p class="seo-meta-val seo-keyword-chip" id="seo-meta-keyword"></p>
             </div>
-            <div class="seo-score-row">
-              <span class="seo-meta-label">SEO Skoru</span>
-              <div class="seo-score-bar-wrap">
-                <div class="seo-score-bar" id="seo-score-bar"></div>
-              </div>
-              <span class="seo-score-num" id="seo-score-num">0 / 100</span>
-            </div>
-            <div class="seo-tips" id="seo-tips-list"></div>
-          </div>
 
-          <div class="seo-actions" id="seo-actions">
+            <!-- SEO + Readability scores side by side -->
+            <div class="seo-scores-grid">
+              <div class="seo-score-col">
+                <span class="seo-meta-label">SEO Skoru</span>
+                <div class="seo-score-bar-wrap">
+                  <div class="seo-score-bar" id="seo-score-bar"></div>
+                </div>
+                <span class="seo-score-num" id="seo-score-num">—</span>
+              </div>
+              <div class="seo-score-col">
+                <span class="seo-meta-label">Okunabilirlik</span>
+                <div class="seo-score-bar-wrap">
+                  <div class="seo-score-bar" id="seo-read-bar"></div>
+                </div>
+                <span class="seo-score-num" id="seo-read-num">—</span>
+              </div>
+            </div>
+
+            <!-- LSI Keywords -->
+            <div class="seo-meta-item" id="seo-lsi-section" hidden>
+              <span class="seo-meta-label">LSI Anahtar Kelimeler <em class="seo-label-hint">tıkla → kopyala</em></span>
+              <div class="seo-lsi-chips" id="seo-lsi-chips"></div>
+            </div>
+
+            <!-- Internal link suggestions -->
+            <div class="seo-meta-item" id="seo-intlinks-section" hidden>
+              <span class="seo-meta-label">İç Link Önerileri <em class="seo-label-hint">arşivden ilgili makaleler</em></span>
+              <div class="seo-intlinks" id="seo-intlinks"></div>
+            </div>
+
+            <!-- SEO Tips -->
+            <div class="seo-tips" id="seo-tips-list"></div>
+
+            <!-- Schema.org (collapsible) -->
+            <div class="seo-toggle-row" id="seo-schema-row" hidden>
+              <button type="button" class="btn ghost seo-toggle-btn" id="seo-toggle-schema">
+                <span id="seo-schema-icon">▶</span> Schema.org JSON-LD
+              </button>
+              <button type="button" class="btn ghost" id="seo-btn-copy-schema">📋 Kopyala</button>
+            </div>
+            <div class="seo-collapsible" id="seo-schema-box" hidden>
+              <pre class="seo-schema-pre" id="seo-schema-pre"></pre>
+            </div>
+
+          </div><!-- /seo-meta-box -->
+
+          <div class="seo-actions">
             <button class="btn primary" id="seo-btn-copy-article">📋 Makaleyi Kopyala</button>
-            <button class="btn primary" id="seo-btn-copy-meta">🔖 Meta Kopyala</button>
+            <button class="btn primary" id="seo-btn-copy-meta">🔖 Meta + LSI Kopyala</button>
             <button class="btn" id="seo-btn-save">💾 Arşive Kaydet</button>
           </div>
-        </div>
+        </div><!-- /form-card -->
 
         <!-- Preview Card -->
         <div class="card preview-card">
@@ -263,9 +316,17 @@
         <div class="archive-toolbar">
           <h3 class="view-title">💾 Kayıtlı SEO Makaleler</h3>
           <div class="spacer"></div>
-          <button class="btn ghost" id="seo-btn-export">⤓ Dışa Aktar (JSON)</button>
+          <button class="btn ghost" id="seo-btn-calendar">📅 Takvim</button>
+          <button class="btn ghost" id="seo-btn-export-csv">⤓ CSV İndir</button>
+          <button class="btn ghost" id="seo-btn-export">⤓ JSON İndir</button>
           <button class="btn ghost" id="seo-btn-clear-archive">🧹 Arşivi Temizle</button>
         </div>
+
+        <!-- Calendar view (hidden by default) -->
+        <div class="seo-calendar-view" id="seo-calendar-view" hidden>
+          <div class="seo-calendar-list" id="seo-calendar-list"></div>
+        </div>
+
         <div class="seo-archive-list" id="seo-archive-list"></div>
         <div class="empty" id="seo-archive-empty" hidden>
           <div class="empty-art">📄</div>
@@ -455,17 +516,27 @@
   <template id="seo-article-tpl">
     <article class="seo-a-card">
       <header class="a-head">
-        <h3 class="seo-a-title"></h3>
+        <div>
+          <h3 class="seo-a-title"></h3>
+          <div class="seo-a-meta">
+            <span class="seo-a-keyword"></span>
+            <span class="seo-a-score"></span>
+            <span class="seo-a-versions badge" hidden></span>
+          </div>
+        </div>
         <time class="a-date"></time>
       </header>
-      <div class="seo-a-meta">
-        <span class="seo-a-keyword"></span>
-        <span class="seo-a-score"></span>
-      </div>
       <p class="seo-a-desc"></p>
+      <div class="seo-a-date-row">
+        <label class="seo-a-date-label">
+          📅 Yayın Tarihi:
+          <input type="date" class="seo-a-target-date" title="Yayın tarihini ayarla" />
+        </label>
+      </div>
       <footer class="a-actions">
         <button class="btn primary seo-a-copy-article">📋 Makale</button>
         <button class="btn primary seo-a-copy-meta">🔖 Meta</button>
+        <button class="btn seo-a-regen" title="Makaleyi yapay zeka ile yeniden yaz">🔄 Yeniden Yaz</button>
         <button class="btn seo-a-edit">✏️ Düzenle</button>
         <button class="btn ghost seo-a-del">🗑️</button>
       </footer>

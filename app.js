@@ -989,36 +989,35 @@ const results = {
 /* ---------------- SEO: System Prompts ---------------- */
 const SEO_ARTICLE_SYSTEM_PROMPT = `Sen web siteleri için Google'da üst sıralarda yer alacak, okuyucuyu çeken, SEO uyumlu Türkçe makaleler yazan uzman bir içerik editörüsün.
 
-GÖREV: Kullanıcı konu başlığı, kategori, ton ve uzunluk bilgisi verecek. Tam olarak "write_seo_article" aracını çağırarak eksiksiz bir makale döndür. Başka metin üretme.
+GÖREV: Kullanıcı konu başlığı, kategori, ton ve uzunluk bilgisi verecek. "write_seo_article" aracını çağırarak eksiksiz bir makale döndür. Başka metin üretme.
 
-SEO BAŞLIĞI (seoTitle):
-- 55-65 karakter arası, kesinlikle bu aralıkta tut
-- Odak anahtar kelimeyi başa yakın yerleştir
-- Merak uyandıran, tıklanabilir; sayı veya soru içerebilir
+SEO BAŞLIĞI (seoTitle): 55-65 karakter arası, kesinlikle. Odak kelimeyi başa yakın koy. Merak uyandıran, tıklanabilir.
 
-META AÇIKLAMA (metaDescription):
-- 150-160 karakter arası, kesinlikle bu aralıkta tut
-- Odak anahtar kelimeyi doğal biçimde içersin
-- Net bir fayda vaat et, eylem çağrısı (CTA) ile bitir
+META AÇIKLAMA (metaDescription): 150-160 karakter arası, kesinlikle. Odak kelimeyi içersin. Net fayda vaat et, CTA ile bitir.
 
-ODAK ANAHTAR KELİME (focusKeyword):
-- 2-4 kelimelik kısa ve hedefli arama terimi
+ODAK ANAHTAR KELİME (focusKeyword): 2-4 kelimelik hedefli arama terimi.
 
 İÇERİK (content) — Markdown formatı:
-- # ile H1 başlığı (seoTitle ile aynı olabilir)
-- ## ile en az 3 H2 ara başlık
-- ### ile gerektiğinde H3 alt başlık
-- Giriş paragrafında ilk 100 kelimede odak anahtar kelimeyi kullan
-- Her H2 bölümünde 2-4 paragraf, madde listeleri (- ile) kullan
-- **kalın** vurgu için çift yıldız
-- Sonuç bölümü mutlaka ekle, okuyucuya eylem çağrısı yap
-- Uzunluk hedefi: Kısa → ~500 kelime | Orta → ~800 kelime | Uzun → ~1200 kelime
+- # H1 başlığı, ## en az 3 H2, ### gerektiğinde H3
+- İlk 100 kelimede odak kelimeyi kullan
+- Her H2'de 2-4 paragraf, madde listeleri (- ile), **kalın** vurgu
+- Sonuç bölümü + CTA; Kısa ~500 | Orta ~800 | Uzun ~1200 kelime
 
-SEO SKORU (seoScore): 0-100 tam sayı; başlık/meta uzunluğu, anahtar kelime yoğunluğu, başlık hiyerarşisi, liste kullanımı gibi kriterlere göre değerlendir.
+LSI ANAHTAR KELİMELER (lsiKeywords): 8-12 adet, odak kelimeyle anlam bağı olan, 1-4 kelimelik arama terimleri. Makale içinde kullanılabilecek türde seç.
 
-SEO İPUÇLARI (seoTips): 3-5 kısa, eyleme geçirilebilir Türkçe madde.
+OKUNABİLİRLİK SKORU (readabilityScore): 0-100 tam sayı. Kısa cümle ve sade kelime = yüksek. Türkçe okuyucu için değerlendir.
 
-OKUMA SÜRESİ (readingTimeMinutes): Türkçe ~200 kelime/dk baz alınarak hesapla.
+OKUNABİLİRLİK SEVİYESİ (readabilityLevel): "Kolay" (80+), "Orta" (50-79) veya "İleri" (0-49).
+
+SCHEMA.ORG (articleSchema): JSON-LD formatında Schema.org Article nesnesi (string). @type:"Article", headline, description, keywords, inLanguage:"tr", datePublished (bugün). Yalnızca JSON nesnesini ver, script etiketi olmadan.
+
+SEO SKORU (seoScore): 0-100; başlık/meta uzunluğu, kelime yoğunluğu, başlık hiyerarşisi, liste kullanımı.
+
+SEO İPUÇLARI (seoTips): 3-5 eyleme geçirilebilir Türkçe madde.
+
+OKUMA SÜRESİ (readingTimeMinutes): ~200 kelime/dk baz alınarak.
+
+Rakip içerik sağlanırsa orada işlenen konuları kapsayacak şekilde daha kapsamlı yaz.
 
 Yalnızca aracı çağır, önsöz veya açıklama ekleme.`;
 
@@ -1036,9 +1035,14 @@ BAŞLIK KURALLARI:
 Yalnızca aracı çağır, başka metin üretme.`;
 
 /* ---------------- SEO: AI methods ---------------- */
-ai.generateSeoArticle = function({ topic, category, keyword, tone, length }, s) {
+ai.generateSeoArticle = function({ topic, category, keyword, tone, length, competitor }, s) {
   const lengthMap = { kisa: '~500 kelime', orta: '~800 kelime', uzun: '~1200 kelime' };
   const lengthDesc = lengthMap[length] || '~800 kelime';
+  let userMsg = `Konu: ${topic}\nKategori: ${category}\nOdak anahtar kelime: ${keyword || 'Otomatik belirle'}\nTon: ${tone}\nUzunluk hedefi: ${lengthDesc}`;
+  if (competitor && competitor.trim()) {
+    userMsg += `\n\nRakip referans içerik:\n${competitor.trim().slice(0, 800)}`;
+  }
+  userMsg += '\n\nBu parametrelerle tam SEO makalesi üret.';
   return this._call({
     system: SEO_ARTICLE_SYSTEM_PROMPT,
     tool: {
@@ -1047,20 +1051,24 @@ ai.generateSeoArticle = function({ topic, category, keyword, tone, length }, s) 
       input_schema: {
         type: 'object',
         properties: {
-          seoTitle:           { type: 'string',  description: 'SEO başlığı, 55-65 karakter.' },
-          metaDescription:    { type: 'string',  description: 'Meta açıklama, 150-160 karakter.' },
-          focusKeyword:       { type: 'string',  description: 'Odak anahtar kelime (2-4 kelime).' },
-          readingTimeMinutes: { type: 'number',  description: 'Tahmini okuma süresi (dakika).' },
-          seoScore:           { type: 'number',  description: 'SEO skoru 0-100.' },
-          content:            { type: 'string',  description: 'Markdown formatında makale içeriği.' },
+          seoTitle:           { type: 'string', description: 'SEO başlığı, 55-65 karakter.' },
+          metaDescription:    { type: 'string', description: 'Meta açıklama, 150-160 karakter.' },
+          focusKeyword:       { type: 'string', description: 'Odak anahtar kelime (2-4 kelime).' },
+          readingTimeMinutes: { type: 'number', description: 'Tahmini okuma süresi (dakika).' },
+          seoScore:           { type: 'number', description: 'SEO skoru 0-100.' },
+          content:            { type: 'string', description: 'Markdown formatında makale içeriği.' },
           seoTips:            { type: 'array', items: { type: 'string' }, description: '3-5 SEO iyileştirme önerisi.' },
+          lsiKeywords:        { type: 'array', items: { type: 'string' }, description: '8-12 LSI anahtar kelime.' },
+          readabilityScore:   { type: 'number', description: 'Okunabilirlik skoru 0-100.' },
+          readabilityLevel:   { type: 'string', description: '"Kolay", "Orta" veya "İleri".' },
+          articleSchema:      { type: 'string', description: 'JSON-LD Schema.org Article nesnesi (string).' },
         },
-        required: ['seoTitle', 'metaDescription', 'focusKeyword', 'readingTimeMinutes', 'seoScore', 'content', 'seoTips'],
+        required: ['seoTitle', 'metaDescription', 'focusKeyword', 'readingTimeMinutes', 'seoScore', 'content', 'seoTips', 'lsiKeywords', 'readabilityScore', 'readabilityLevel', 'articleSchema'],
       },
     },
-    userMessage: `Konu: ${topic}\nKategori: ${category}\nOdak anahtar kelime: ${keyword || 'Otomatik belirle'}\nTon: ${tone}\nUzunluk hedefi: ${lengthDesc}\n\nBu parametrelerle tam SEO makalesi üret.`,
+    userMessage: userMsg,
     s,
-    maxTokens: 4096,
+    maxTokens: 6000,
   });
 };
 
@@ -1148,6 +1156,27 @@ const seoDB = {
     this.save(items);
   },
   remove(id) { this.save(this.list().filter(x => x.id !== id)); },
+  update(id, newData) {
+    const items = this.list();
+    const idx = items.findIndex(x => x.id === id);
+    if (idx === -1) return;
+    const old = items[idx];
+    const versions = old.versions || [];
+    versions.unshift({
+      seoTitle: old.seoTitle, metaDescription: old.metaDescription,
+      content: old.content, focusKeyword: old.focusKeyword,
+      seoScore: old.seoScore, savedAt: Date.now(),
+    });
+    items[idx] = { ...old, ...newData, versions, updatedAt: Date.now() };
+    this.save(items);
+  },
+  setDate(id, date) {
+    const items = this.list();
+    const idx = items.findIndex(x => x.id === id);
+    if (idx === -1) return;
+    items[idx].targetDate = date || null;
+    this.save(items);
+  },
 };
 
 /* ---------------- SEO: Category labels ---------------- */
@@ -1170,6 +1199,7 @@ const SEO_CATEGORY_LABELS = {
 /* ---------------- SEO: Editor ---------------- */
 const seoEditor = {
   currentArticle: null,
+  currentSchema:  null,
 
   init() {
     $('#seo-topic').addEventListener('input', () => {
@@ -1180,6 +1210,20 @@ const seoEditor = {
     $('#seo-btn-copy-article').addEventListener('click', () => this.copyArticle());
     $('#seo-btn-copy-meta').addEventListener('click', () => this.copyMeta());
     $('#seo-btn-save').addEventListener('click', () => this.save());
+    $('#seo-btn-copy-schema').addEventListener('click', () => this.copySchema());
+
+    $('#seo-toggle-competitor').addEventListener('click', () => {
+      const box  = $('#seo-competitor-box');
+      const icon = $('#seo-competitor-icon');
+      box.hidden = !box.hidden;
+      icon.textContent = box.hidden ? '▶' : '▼';
+    });
+    $('#seo-toggle-schema').addEventListener('click', () => {
+      const box  = $('#seo-schema-box');
+      const icon = $('#seo-schema-icon');
+      box.hidden = !box.hidden;
+      icon.textContent = box.hidden ? '▶' : '▼';
+    });
   },
 
   async generate() {
@@ -1198,12 +1242,13 @@ const seoEditor = {
     try {
       const out = await ai.generateSeoArticle({
         topic,
-        category: SEO_CATEGORY_LABELS[$('#seo-category').value] || $('#seo-category').value,
-        keyword:  $('#seo-keyword').value.trim(),
-        tone:     $('#seo-tone').value,
-        length:   $('#seo-length').value,
+        category:   SEO_CATEGORY_LABELS[$('#seo-category').value] || $('#seo-category').value,
+        keyword:    $('#seo-keyword').value.trim(),
+        tone:       $('#seo-tone').value,
+        length:     $('#seo-length').value,
+        competitor: $('#seo-competitor').value.trim(),
       }, s);
-      this.currentArticle = { ...out, topic };
+      this.currentArticle = { ...out, topic, category: $('#seo-category').value };
       this.showArticle(out);
       toast('⚡ Makale üretildi');
     } catch (e) {
@@ -1218,29 +1263,65 @@ const seoEditor = {
 
   showArticle(data) {
     $('#seo-article-preview').innerHTML = simpleMarkdown(data.content || '');
-
     $('#seo-meta-box').hidden = false;
 
+    // SEO title
     $('#seo-meta-title').textContent = data.seoTitle || '';
-    const tLen = (data.seoTitle || '').length;
+    const tLen  = (data.seoTitle || '').length;
     const tHint = $('#seo-meta-title-len');
     tHint.textContent = `${tLen} karakter — ${tLen < 55 ? 'çok kısa' : tLen > 65 ? 'çok uzun' : 'ideal ✓'}`;
-    tHint.style.color  = tLen >= 55 && tLen <= 65 ? 'var(--ok)' : 'var(--warn)';
+    tHint.style.color = tLen >= 55 && tLen <= 65 ? 'var(--ok)' : 'var(--warn)';
 
+    // Meta description
     $('#seo-meta-desc').textContent = data.metaDescription || '';
-    const dLen = (data.metaDescription || '').length;
+    const dLen  = (data.metaDescription || '').length;
     const dHint = $('#seo-meta-desc-len');
     dHint.textContent = `${dLen} karakter — ${dLen < 150 ? 'kısa' : dLen > 160 ? 'uzun' : 'ideal ✓'}`;
-    dHint.style.color  = dLen >= 150 && dLen <= 160 ? 'var(--ok)' : 'var(--warn)';
+    dHint.style.color = dLen >= 150 && dLen <= 160 ? 'var(--ok)' : 'var(--warn)';
 
+    // Focus keyword
     $('#seo-meta-keyword').textContent = data.focusKeyword || '—';
 
-    const score = Math.min(100, Math.max(0, Math.round(data.seoScore || 0)));
-    const bar = $('#seo-score-bar');
-    bar.style.width      = score + '%';
-    bar.style.background = score >= 80 ? 'var(--ok)' : score >= 60 ? 'var(--warn)' : 'var(--danger)';
-    $('#seo-score-num').textContent = score + ' / 100';
+    // SEO score
+    const sc = Math.min(100, Math.max(0, Math.round(data.seoScore || 0)));
+    const scBar = $('#seo-score-bar');
+    scBar.style.width      = sc + '%';
+    scBar.style.background = sc >= 80 ? 'var(--ok)' : sc >= 60 ? 'var(--warn)' : 'var(--danger)';
+    $('#seo-score-num').textContent = sc + ' / 100';
 
+    // Readability score
+    const rs = Math.min(100, Math.max(0, Math.round(data.readabilityScore || 0)));
+    const rsBar = $('#seo-read-bar');
+    rsBar.style.width      = rs + '%';
+    rsBar.style.background = rs >= 80 ? 'var(--ok)' : rs >= 50 ? 'var(--warn)' : 'var(--danger)';
+    $('#seo-read-num').textContent = `${rs} / 100 · ${data.readabilityLevel || '—'}`;
+
+    // LSI keywords — clickable chips
+    const lsiSection = $('#seo-lsi-section');
+    const lsiChips   = $('#seo-lsi-chips');
+    lsiChips.innerHTML = '';
+    if (data.lsiKeywords && data.lsiKeywords.length) {
+      lsiSection.hidden = false;
+      data.lsiKeywords.forEach(kw => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'seo-lsi-chip';
+        b.textContent = kw;
+        b.title = 'Kopyala: ' + kw;
+        b.addEventListener('click', async () => {
+          try { await copyText(kw); toast('📋 ' + kw); }
+          catch { toast('Kopyalanamadı'); }
+        });
+        lsiChips.appendChild(b);
+      });
+    } else {
+      lsiSection.hidden = true;
+    }
+
+    // Internal link suggestions from archive
+    this.showInternalLinks(data.focusKeyword, data.content);
+
+    // SEO tips
     const tipsEl = $('#seo-tips-list');
     tipsEl.innerHTML = '';
     (data.seoTips || []).forEach(tip => {
@@ -1250,21 +1331,88 @@ const seoEditor = {
       tipsEl.appendChild(d);
     });
 
+    // Schema.org JSON-LD
+    this.currentSchema = data.articleSchema || null;
+    const schemaRow = $('#seo-schema-row');
+    if (data.articleSchema) {
+      schemaRow.hidden = false;
+      $('#seo-schema-pre').textContent = data.articleSchema;
+      $('#seo-schema-box').hidden = true;
+      $('#seo-schema-icon').textContent = '▶';
+    } else {
+      schemaRow.hidden = true;
+    }
+
+    // Reading badge
     const badge = $('#seo-reading-badge');
     badge.hidden = false;
     badge.textContent = `⏱️ ${Math.max(1, Math.round(data.readingTimeMinutes || 1))} dk okuma`;
+  },
+
+  showInternalLinks(focusKeyword, content) {
+    const section   = $('#seo-intlinks-section');
+    const container = $('#seo-intlinks');
+    container.innerHTML = '';
+
+    const all = seoDB.list();
+    if (all.length < 1) { section.hidden = true; return; }
+
+    const curKw      = (focusKeyword || '').toLowerCase();
+    const curContent = (content || '').toLowerCase();
+
+    const scored = all
+      .filter(it => it.id !== this.currentArticle?.id)
+      .map(it => {
+        const titleWords = (it.seoTitle || it.topic || '').toLowerCase().split(/\s+/);
+        const kw = (it.focusKeyword || '').toLowerCase();
+        let score = 0;
+        if (kw && curContent.includes(kw)) score += 3;
+        if (kw && curKw === kw) score -= 5;
+        titleWords.forEach(w => { if (w.length > 3 && curContent.includes(w)) score++; });
+        return { ...it, _score: score };
+      })
+      .filter(it => it._score > 0)
+      .sort((a, b) => b._score - a._score)
+      .slice(0, 4);
+
+    if (!scored.length) { section.hidden = true; return; }
+    section.hidden = false;
+
+    scored.forEach(it => {
+      const title = it.seoTitle || it.topic || '—';
+      const row = document.createElement('div');
+      row.className = 'seo-intlink';
+      const titleSpan = document.createElement('span');
+      titleSpan.className = 'seo-intlink-title';
+      titleSpan.textContent = title;
+      const copyBtn = document.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.className = 'seo-intlink-copy';
+      copyBtn.textContent = '📋 Başlık';
+      copyBtn.addEventListener('click', async () => {
+        try { await copyText(title); toast('📋 Başlık kopyalandı'); }
+        catch { toast('Kopyalanamadı'); }
+      });
+      row.appendChild(titleSpan);
+      row.appendChild(copyBtn);
+      container.appendChild(row);
+    });
   },
 
   clear() {
     if ($('#seo-topic').value || this.currentArticle) {
       if (!confirm('Editör temizlensin mi?')) return;
     }
-    $('#seo-topic').value   = '';
-    $('#seo-keyword').value = '';
+    $('#seo-topic').value      = '';
+    $('#seo-keyword').value    = '';
+    $('#seo-competitor').value = '';
     $('#seo-c-topic').textContent = '0';
     this.currentArticle = null;
+    this.currentSchema  = null;
     $('#seo-meta-box').hidden = true;
     $('#seo-reading-badge').hidden = true;
+    $('#seo-competitor-box').hidden = true;
+    $('#seo-competitor-icon').textContent = '▶';
     $('#seo-article-preview').innerHTML = `
       <div class="seo-empty-preview">
         <div class="empty-art">📄</div>
@@ -1281,23 +1429,40 @@ const seoEditor = {
 
   async copyMeta() {
     if (!this.currentArticle) { toast('Önce bir makale üret'); return; }
-    const a = this.currentArticle;
-    const text = `SEO Başlık: ${a.seoTitle || ''}\n\nMeta Açıklama: ${a.metaDescription || ''}\n\nOdak Anahtar Kelime: ${a.focusKeyword || ''}`;
-    try { await copyText(text); toast('🔖 Meta bilgiler kopyalandı'); }
+    const a   = this.currentArticle;
+    const lsi = (a.lsiKeywords || []).join(', ');
+    const text = `SEO Başlık: ${a.seoTitle || ''}\n\nMeta Açıklama: ${a.metaDescription || ''}\n\nOdak Anahtar Kelime: ${a.focusKeyword || ''}${lsi ? '\n\nLSI Kelimeler: ' + lsi : ''}`;
+    try { await copyText(text); toast('🔖 Meta + LSI kopyalandı'); }
+    catch { toast('Kopyalanamadı'); }
+  },
+
+  async copySchema() {
+    if (!this.currentSchema) { toast('Schema.org mevcut değil'); return; }
+    const wrapped = `<script type="application/ld+json">\n${this.currentSchema}\n<\/script>`;
+    try { await copyText(wrapped); toast('📋 Schema.org kopyalandı'); }
     catch { toast('Kopyalanamadı'); }
   },
 
   save() {
     if (!this.currentArticle) { toast('Önce bir makale üret'); return; }
-    seoDB.add({ id: newId(), ...this.currentArticle, topic: $('#seo-topic').value.trim(), createdAt: Date.now() });
+    seoDB.add({
+      id: newId(),
+      ...this.currentArticle,
+      topic:      $('#seo-topic').value.trim(),
+      category:   $('#seo-category').value,
+      createdAt:  Date.now(),
+      targetDate: null,
+      versions:   [],
+    });
     seoArchive.refresh();
     toast('💾 Makale arşive kaydedildi');
   },
 
   loadFrom(item) {
     $('#seo-topic').value = item.topic || item.seoTitle || '';
-    $('#seo-c-topic').textContent = ($('#seo-topic').value).length;
+    $('#seo-c-topic').textContent = $('#seo-topic').value.length;
     this.currentArticle = item;
+    this.currentSchema  = item.articleSchema || null;
     this.showArticle(item);
     tabs.show('seo');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1456,8 +1621,8 @@ const seoIdeas = {
     for (let i = 0; i < selected.length; i++) {
       btn.textContent = `⏳ ${i + 1}/${selected.length} yazılıyor`;
       try {
-        const out = await ai.generateSeoArticle({ topic: selected[i], category: cat, keyword: '', tone, length }, s);
-        seoDB.add({ id: newId(), ...out, topic: selected[i], createdAt: Date.now() });
+        const out = await ai.generateSeoArticle({ topic: selected[i], category: cat, keyword: '', tone, length, competitor: '' }, s);
+        seoDB.add({ id: newId(), ...out, topic: selected[i], category: $('#si-category').value, createdAt: Date.now(), targetDate: null, versions: [] });
         ok++;
       } catch (e) {
         console.error('SEO toplu üretim hatası:', selected[i], e);
@@ -1482,9 +1647,13 @@ const seoIdeas = {
 
 /* ---------------- SEO: Archive ---------------- */
 const seoArchive = {
+  calendarVisible: false,
+
   init() {
-    $('#seo-btn-export').addEventListener('click', () => this.exportAll());
+    $('#seo-btn-export').addEventListener('click', () => this.exportJson());
+    $('#seo-btn-export-csv').addEventListener('click', () => this.exportCsv());
     $('#seo-btn-clear-archive').addEventListener('click', () => this.clearAll());
+    $('#seo-btn-calendar').addEventListener('click', () => this.toggleCalendar());
     this.refresh();
   },
 
@@ -1503,7 +1672,7 @@ const seoArchive = {
     items.forEach(it => {
       const node = tpl.content.firstElementChild.cloneNode(true);
       node.querySelector('.seo-a-title').textContent = it.seoTitle || it.topic || '—';
-      node.querySelector('.a-date').textContent       = fmtDate(it.createdAt);
+      node.querySelector('.a-date').textContent       = fmtDate(it.updatedAt || it.createdAt);
 
       const kwEl = node.querySelector('.seo-a-keyword');
       kwEl.textContent = it.focusKeyword ? '🔑 ' + it.focusKeyword : '';
@@ -1518,7 +1687,22 @@ const seoArchive = {
         scoreEl.hidden = true;
       }
 
+      const versEl = node.querySelector('.seo-a-versions');
+      const vCount = (it.versions || []).length;
+      if (vCount > 0) {
+        versEl.hidden = false;
+        versEl.textContent = `📋 ${vCount} sürüm`;
+      }
+
       node.querySelector('.seo-a-desc').textContent = it.metaDescription || '';
+
+      const dateInput = node.querySelector('.seo-a-target-date');
+      dateInput.value = it.targetDate || '';
+      dateInput.addEventListener('change', (e) => {
+        seoDB.setDate(it.id, e.target.value);
+        if (this.calendarVisible) this.renderCalendar();
+        toast('📅 Yayın tarihi güncellendi');
+      });
 
       node.querySelector('.seo-a-copy-article').addEventListener('click', async () => {
         try { await copyText(it.content || ''); toast('📋 Makale kopyalandı'); }
@@ -1526,10 +1710,12 @@ const seoArchive = {
       });
       node.querySelector('.seo-a-copy-meta').addEventListener('click', async () => {
         try {
-          const text = `SEO Başlık: ${it.seoTitle || ''}\n\nMeta Açıklama: ${it.metaDescription || ''}\n\nOdak Anahtar Kelime: ${it.focusKeyword || ''}`;
-          await copyText(text); toast('🔖 Meta kopyalandı');
+          const lsi  = (it.lsiKeywords || []).join(', ');
+          const text = `SEO Başlık: ${it.seoTitle || ''}\n\nMeta Açıklama: ${it.metaDescription || ''}\n\nOdak Anahtar Kelime: ${it.focusKeyword || ''}${lsi ? '\n\nLSI Kelimeler: ' + lsi : ''}`;
+          await copyText(text); toast('🔖 Meta + LSI kopyalandı');
         } catch { toast('Kopyalanamadı'); }
       });
+      node.querySelector('.seo-a-regen').addEventListener('click', () => this.regenerate(it));
       node.querySelector('.seo-a-edit').addEventListener('click', () => seoEditor.loadFrom(it));
       node.querySelector('.seo-a-del').addEventListener('click', () => {
         if (!confirm(`"${it.seoTitle || it.topic}" silinsin mi?`)) return;
@@ -1539,21 +1725,120 @@ const seoArchive = {
       });
       list.appendChild(node);
     });
+
+    if (this.calendarVisible) this.renderCalendar();
   },
 
-  exportAll() {
+  async regenerate(item) {
+    const s = settings.load();
+    if (!s.apiKey) { toast('Önce ⚙️ Ayarlar\'dan API anahtarı gir'); settings.open(); return; }
+    if (!confirm(`"${item.seoTitle || item.topic}" yeniden yazılsın mı?\nMevcut sürüm geçmişe kaydedilir.`)) return;
+
+    toast('⏳ Yeniden yazılıyor…');
+    try {
+      const out = await ai.generateSeoArticle({
+        topic:      item.topic || item.seoTitle || '',
+        category:   SEO_CATEGORY_LABELS[item.category] || 'Genel / Karışık',
+        keyword:    item.focusKeyword || '',
+        tone:       'bilgilendirici',
+        length:     'orta',
+        competitor: '',
+      }, s);
+      seoDB.update(item.id, out);
+      this.refresh();
+      toast('✅ Yeniden yazıldı · eski sürüm geçmişte');
+    } catch (e) {
+      console.error(e);
+      toast('Başarısız: ' + (e.message || 'hata'));
+    }
+  },
+
+  toggleCalendar() {
+    this.calendarVisible = !this.calendarVisible;
+    $('#seo-calendar-view').hidden = !this.calendarVisible;
+    $('#seo-btn-calendar').textContent = this.calendarVisible ? '📅 Takvimi Kapat' : '📅 Takvim';
+    if (this.calendarVisible) this.renderCalendar();
+  },
+
+  renderCalendar() {
+    const list = $('#seo-calendar-list');
+    list.innerHTML = '';
+    const items      = seoDB.list();
+    const withDate   = items.filter(it => it.targetDate).sort((a, b) => a.targetDate.localeCompare(b.targetDate));
+    const noDate     = items.filter(it => !it.targetDate);
+
+    [...withDate, ...noDate].forEach(it => {
+      const div = document.createElement('div');
+      div.className = 'seo-cal-item';
+      const sc = it.seoScore != null ? `SEO ${Math.round(it.seoScore)}/100` : '';
+
+      const dateEl = document.createElement('span');
+      dateEl.className = 'seo-cal-date';
+      dateEl.textContent = it.targetDate
+        ? new Date(it.targetDate).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' })
+        : '📌 Tarihsiz';
+
+      const titleEl = document.createElement('span');
+      titleEl.className = 'seo-cal-title';
+      titleEl.textContent = it.seoTitle || it.topic || '—';
+
+      const scoreEl = document.createElement('span');
+      scoreEl.className = 'seo-cal-score';
+      scoreEl.textContent = sc;
+
+      div.appendChild(dateEl);
+      div.appendChild(titleEl);
+      div.appendChild(scoreEl);
+      list.appendChild(div);
+    });
+
+    if (!items.length) {
+      const p = document.createElement('p');
+      p.style.cssText = 'color:var(--muted);text-align:center;padding:16px;margin:0;font-size:13px';
+      p.textContent = 'Henüz kayıtlı makale yok.';
+      list.appendChild(p);
+    }
+  },
+
+  exportJson() {
     const items = seoDB.list();
     if (!items.length) { toast('Arşiv boş'); return; }
     const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
     const url  = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href     = url;
+    a.href = url;
     a.download = `seo-makaleler-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
-    toast('⤓ Dışa aktarıldı');
+    toast('⤓ JSON dışa aktarıldı');
+  },
+
+  exportCsv() {
+    const items = seoDB.list();
+    if (!items.length) { toast('Arşiv boş'); return; }
+    const e = s => '"' + String(s || '').replace(/"/g, '""') + '"';
+    const rows = [
+      ['SEO Başlık','Meta Açıklama','Odak Anahtar Kelime','LSI Kelimeler','SEO Skoru','Okunabilirlik','Okunabilirlik Seviyesi','Yayın Tarihi','İçerik (Markdown)'].map(e).join(','),
+      ...items.map(it => [
+        it.seoTitle || '',
+        it.metaDescription || '',
+        it.focusKeyword || '',
+        (it.lsiKeywords || []).join('; '),
+        it.seoScore != null ? it.seoScore : '',
+        it.readabilityScore != null ? it.readabilityScore : '',
+        it.readabilityLevel || '',
+        it.targetDate || '',
+        it.content || '',
+      ].map(e).join(',')),
+    ];
+    const blob = new Blob(['﻿' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `seo-makaleler-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    toast('⤓ CSV indirildi — Excel\'e yapıştırmaya hazır');
   },
 
   clearAll() {
