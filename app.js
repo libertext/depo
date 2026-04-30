@@ -874,6 +874,247 @@ const ideas = {
   },
 };
 
+/* ---------------- Static Content Pool ---------------- */
+const POOL_DATA = [
+  // Aile Hukuku
+  { id: 'a1', topic: 'Boşanma davası ne kadar sürer?', area: 'aile' },
+  { id: 'a2', topic: 'Anlaşmalı ve çekişmeli boşanma arasındaki fark', area: 'aile' },
+  { id: 'a3', topic: 'Velayet nasıl belirlenir?', area: 'aile' },
+  { id: 'a4', topic: 'Nafaka miktarı nasıl hesaplanır?', area: 'aile' },
+  { id: 'a5', topic: 'Çocukla kişisel ilişki kurma hakkı nedir?', area: 'aile' },
+  { id: 'a6', topic: 'Edinilmiş mallara katılma rejimi nasıl işler?', area: 'aile' },
+  { id: 'a7', topic: 'Boşanmada tazminat hakkı ne zaman doğar?', area: 'aile' },
+  { id: 'a8', topic: 'Boşanmada aile konutu kime kalır?', area: 'aile' },
+  // Ceza Hukuku
+  { id: 'c1', topic: 'Tutukluluk ile tutuklanma arasındaki fark', area: 'ceza' },
+  { id: 'c2', topic: 'Gözaltı süresi ne kadar olabilir?', area: 'ceza' },
+  { id: 'c3', topic: 'Üst araması ile araç araması arasındaki fark', area: 'ceza' },
+  { id: 'c4', topic: 'Ağır ceza ve asliye ceza mahkemesi farkı', area: 'ceza' },
+  { id: 'c5', topic: 'Şikayetten vazgeçme davayı düşürür mü?', area: 'ceza' },
+  { id: 'c6', topic: 'Beraat ile düşme kararı arasındaki fark', area: 'ceza' },
+  { id: 'c7', topic: 'Ertelenmiş ceza ne anlama gelir?', area: 'ceza' },
+  { id: 'c8', topic: 'Cumhuriyet savcılığına suç duyurusunda nereye başvurulur?', area: 'ceza' },
+  { id: 'c9', topic: 'Haksız tahrik ceza indirimi nasıl uygulanır?', area: 'ceza' },
+  // İş Hukuku
+  { id: 'i1', topic: 'Kıdem tazminatı ne zaman hak kazanılır?', area: 'is' },
+  { id: 'i2', topic: 'İhbar tazminatı nasıl hesaplanır?', area: 'is' },
+  { id: 'i3', topic: 'Haksız fesih ile haklı fesih arasındaki fark', area: 'is' },
+  { id: 'i4', topic: 'Mobbing (işyeri tacizi) nasıl ispatlanır?', area: 'is' },
+  { id: 'i5', topic: 'Fazla mesai ücreti nasıl hesaplanır?', area: 'is' },
+  { id: 'i6', topic: 'İş kazası geçirdim ne yapmalıyım?', area: 'is' },
+  { id: 'i7', topic: 'Yıllık izin kullandırılmazsa işçinin hakları', area: 'is' },
+  { id: 'i8', topic: 'İstifa ederken dikkat edilmesi gerekenler', area: 'is' },
+  { id: 'i9', topic: 'İşten çıkarılan işçinin iş güvencesi hakları', area: 'is' },
+  // Tazminat Hukuku
+  { id: 't1', topic: 'Trafik kazasında maddi ve manevi tazminat hakkı', area: 'tazminat' },
+  { id: 't2', topic: 'Doktor hatası (malpraktis) tazminat davası', area: 'tazminat' },
+  { id: 't3', topic: 'Manevi tazminat ne zaman hak kazanılır?', area: 'tazminat' },
+  { id: 't4', topic: 'Destekten yoksun kalma tazminatı nedir?', area: 'tazminat' },
+  { id: 't5', topic: 'Tazminat davalarında zamanaşımı ne zamana kadar sürer?', area: 'tazminat' },
+  { id: 't6', topic: 'Bedensel zarar tazminatı nasıl hesaplanır?', area: 'tazminat' },
+  { id: 't7', topic: 'Haksız fiil ile sözleşmeye aykırılık farkı', area: 'tazminat' },
+  // Kira / Gayrimenkul
+  { id: 'k1', topic: 'Kira artışında yasal tavan nedir?', area: 'kira' },
+  { id: 'k2', topic: 'Kiracı kirayı ödemezse ev sahibi ne yapabilir?', area: 'kira' },
+  { id: 'k3', topic: 'Kiracının tahliyesi nasıl sağlanır?', area: 'kira' },
+  { id: 'k4', topic: 'Depozito ne zaman geri alınır?', area: 'kira' },
+  { id: 'k5', topic: 'Kat mülkiyeti ve kat irtifakı arasındaki fark', area: 'kira' },
+  { id: 'k6', topic: 'Apartman yönetimine karşı haklarım nelerdir?', area: 'kira' },
+  { id: 'k7', topic: 'Tapu devri sırasında nelere dikkat edilmeli?', area: 'kira' },
+  { id: 'k8', topic: 'Kiracı ev sahibi izni olmadan tamirat yapabilir mi?', area: 'kira' },
+  // Tüketici Hukuku
+  { id: 'tu1', topic: 'Ayıplı malda iade ve değişim hakkı nasıl kullanılır?', area: 'tuketici' },
+  { id: 'tu2', topic: 'Cayma hakkı kaç gün içinde kullanılmalıdır?', area: 'tuketici' },
+  { id: 'tu3', topic: 'Tüketici hakem heyetine nasıl başvurulur?', area: 'tuketici' },
+  { id: 'tu4', topic: 'Banka kredisinde erken ödeme ücretinin sınırı', area: 'tuketici' },
+  { id: 'tu5', topic: 'Abonelik sözleşmesinden nasıl çıkılır?', area: 'tuketici' },
+  { id: 'tu6', topic: 'E-ticaret alışverişlerinde iade süreci', area: 'tuketici' },
+  { id: 'tu7', topic: 'Garanti kapsamı dışı bırakma hukuka aykırı mıdır?', area: 'tuketici' },
+  { id: 'tu8', topic: 'Tüketici mahkemesinde dava açma parasal sınırı', area: 'tuketici' },
+  // Miras Hukuku
+  { id: 'm1', topic: 'Mirasçılıktan çıkarma (ıskat) ne zaman yapılır?', area: 'miras' },
+  { id: 'm2', topic: 'Vasiyetname türleri ve geçerlilik koşulları', area: 'miras' },
+  { id: 'm3', topic: 'Miras paylaşımında saklı pay nedir?', area: 'miras' },
+  { id: 'm4', topic: 'Mirası reddetmek için ne kadar süre var?', area: 'miras' },
+  { id: 'm5', topic: 'Borca batık mirasın yönetimi nasıl sağlanır?', area: 'miras' },
+  { id: 'm6', topic: 'Mirasbırakanın borçları mirasçılara geçer mi?', area: 'miras' },
+  { id: 'm7', topic: 'Vasiyet ile miras sözleşmesi arasındaki fark', area: 'miras' },
+  { id: 'm8', topic: 'Veraset ilamı (mirasçılık belgesi) nasıl alınır?', area: 'miras' },
+  // KVKK / Dijital
+  { id: 'kv1', topic: 'Kişisel veri ihlalinde haklarım nelerdir?', area: 'kvkk' },
+  { id: 'kv2', topic: 'KVKK kapsamında Kurum\'a şikâyet nasıl yapılır?', area: 'kvkk' },
+  { id: 'kv3', topic: 'Fotoğrafımın izinsiz paylaşılması suç mudur?', area: 'kvkk' },
+  { id: 'kv4', topic: 'Sosyal medyada hakaret ve iftira davası', area: 'kvkk' },
+  { id: 'kv5', topic: 'Şirketlerin kişisel veri saklama yükümlülüğü', area: 'kvkk' },
+  { id: 'kv6', topic: 'Çerez (cookie) politikası ve açık rıza zorunluluğu', area: 'kvkk' },
+  { id: 'kv7', topic: 'Unutulma hakkı nedir ve nasıl kullanılır?', area: 'kvkk' },
+  { id: 'kv8', topic: 'İnternet bankacılığı dolandırıcılığında sorumluluk', area: 'kvkk' },
+  // Borçlar / Sözleşmeler
+  { id: 'b1', topic: 'Sözleşmeden caymanın hukuki sonuçları', area: 'borclar' },
+  { id: 'b2', topic: 'Her sözleşme yazılı olmak zorunda mıdır?', area: 'borclar' },
+  { id: 'b3', topic: 'Cezai şartın geçerlilik koşulları', area: 'borclar' },
+  { id: 'b4', topic: 'Sözleşmede mücbir sebep (force majeure) nedir?', area: 'borclar' },
+  { id: 'b5', topic: 'Alacağın devri (temlik) nasıl yapılır?', area: 'borclar' },
+  { id: 'b6', topic: 'Garanti ile kefalet arasındaki temel fark', area: 'borclar' },
+  { id: 'b7', topic: 'Borca batık kişi hangi adımları atmalıdır?', area: 'borclar' },
+  { id: 'b8', topic: 'Zamanaşımı ile hak düşürücü süre arasındaki fark', area: 'borclar' },
+];
+
+const pool = {
+  selected: new Set(),
+  activeAreas: new Set(),
+
+  init() {
+    $('#p-search').addEventListener('input', () => this.render());
+    $('#p-build').addEventListener('click', () => this.buildSelected());
+    $('#p-clear-sel').addEventListener('click', () => {
+      this.selected.clear();
+      this.render();
+    });
+
+    $('#p-list').addEventListener('change', (e) => {
+      if (!e.target.matches('.p-check')) return;
+      const id = e.target.dataset.id;
+      if (e.target.checked) this.selected.add(id);
+      else this.selected.delete(id);
+      this.updateBuildBtn();
+    });
+
+    $('#p-list').addEventListener('click', (e) => {
+      const btn = e.target.closest('.p-to-editor');
+      if (!btn) return;
+      const id = btn.dataset.id;
+      const item = POOL_DATA.find(p => p.id === id);
+      if (!item) return;
+      editor.editingId = null;
+      editor.els.topic.value = item.topic;
+      editor.render();
+      editor.saveDraft();
+      tabs.show('editor');
+      editor.els.topic.focus();
+      toast('💡 Başlık editöre yapıştı — ⚡ Üret\'e bas');
+    });
+
+    this.renderAreaChips();
+    this.render();
+  },
+
+  renderAreaChips() {
+    const container = $('#p-areas');
+    container.innerHTML = '';
+    const countByArea = {};
+    POOL_DATA.forEach(p => { countByArea[p.area] = (countByArea[p.area] || 0) + 1; });
+
+    Object.entries(AREA_LABELS).filter(([k]) => k !== 'karisik').forEach(([key, label]) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'pool-area-chip';
+      btn.dataset.area = key;
+      btn.innerHTML = `${label} <span class="pool-area-count">${countByArea[key] || 0}</span>`;
+      btn.addEventListener('click', () => {
+        if (this.activeAreas.has(key)) this.activeAreas.delete(key);
+        else this.activeAreas.add(key);
+        $$('.pool-area-chip').forEach(c => {
+          c.classList.toggle('is-active', this.activeAreas.has(c.dataset.area));
+        });
+        this.render();
+      });
+      container.appendChild(btn);
+    });
+  },
+
+  getFiltered() {
+    const q = $('#p-search').value.trim().toLowerCase();
+    return POOL_DATA.filter(p => {
+      const areaMatch = this.activeAreas.size === 0 || this.activeAreas.has(p.area);
+      const textMatch = !q || p.topic.toLowerCase().includes(q);
+      return areaMatch && textMatch;
+    });
+  },
+
+  render() {
+    const items = this.getFiltered();
+    const list = $('#p-list');
+    const empty = $('#p-empty');
+    list.innerHTML = '';
+
+    if (!items.length) {
+      empty.hidden = false;
+      this.updateBuildBtn();
+      return;
+    }
+    empty.hidden = true;
+
+    items.forEach(p => {
+      const row = document.createElement('label');
+      row.className = 'p-item' + (this.selected.has(p.id) ? ' is-checked' : '');
+      const areaLabel = AREA_LABELS[p.area] || p.area;
+      row.innerHTML = `
+        <input type="checkbox" class="p-check" data-id="${escAttr(p.id)}" ${this.selected.has(p.id) ? 'checked' : ''} />
+        <span class="p-topic"></span>
+        <span class="p-area-badge"></span>
+        <button type="button" class="p-to-editor" data-id="${escAttr(p.id)}" title="Editöre yükle">→ Editör</button>
+      `;
+      row.querySelector('.p-topic').textContent = p.topic;
+      row.querySelector('.p-area-badge').textContent = areaLabel;
+      list.appendChild(row);
+    });
+    this.updateBuildBtn();
+  },
+
+  updateBuildBtn() {
+    const n = this.selected.size;
+    $('#p-build').disabled = n === 0;
+    $('#p-sel-info').textContent = n > 0 ? `${n} başlık seçili` : '';
+  },
+
+  async buildSelected() {
+    const s = settings.load();
+    if (!s.apiKey) {
+      toast('Önce ⚙️ Ayarlar\'dan API anahtarı gir');
+      settings.open();
+      return;
+    }
+    const selectedItems = POOL_DATA.filter(p => this.selected.has(p.id));
+    if (!selectedItems.length) { toast('En az 1 başlık seç'); return; }
+
+    const btn = $('#p-build');
+    const origLabel = btn.textContent;
+    btn.disabled = true;
+    btn.classList.add('is-loading');
+
+    let ok = 0, fail = 0;
+    for (let i = 0; i < selectedItems.length; i++) {
+      btn.textContent = `⏳ ${i + 1}/${selectedItems.length} üretiliyor`;
+      try {
+        const out = await ai.generate(selectedItems[i].topic, s);
+        results.add({
+          id: newId(),
+          topic: selectedItems[i].topic,
+          content: out.content || '',
+          reels:   out.reels   || '',
+          tags:    out.tags    || '',
+          createdAt: Date.now(),
+        });
+        ok++;
+      } catch (e) {
+        console.error('pool build failed:', selectedItems[i].topic, e);
+        fail++;
+      }
+    }
+
+    btn.disabled = false;
+    btn.classList.remove('is-loading');
+    btn.textContent = origLabel;
+
+    this.selected.clear();
+    this.render();
+    tabs.show('results');
+    if (fail === 0) toast(`✨ ${ok} sonuç üretildi`);
+    else toast(`✨ ${ok} başarılı · ${fail} hata`);
+  },
+};
+
 /* ---------------- Results (toplu üretim çıktıları) ---------------- */
 function escAttr(s) {
   return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -1015,4 +1256,5 @@ document.addEventListener('DOMContentLoaded', () => {
   results.init();
   settings.init();
   ideas.init();
+  pool.init();
 });

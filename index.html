@@ -22,6 +22,7 @@
       <button class="tab" data-tab="results" role="tab" aria-selected="false">
         📦 Sonuçlar <span class="count" id="resultsCount">0</span>
       </button>
+      <button class="tab" data-tab="pool" role="tab" aria-selected="false">📚 Havuz</button>
       <button class="tab" data-tab="archive" role="tab" aria-selected="false">
         🗂️ Arşiv <span class="count" id="archiveCount">0</span>
       </button>
@@ -115,6 +116,24 @@
         <div class="empty-art">📦</div>
         <h3>Henüz üretilen sonuç yok</h3>
         <p>💡 <b>Fikir Öner</b>'i aç → alan seç → ⚡ Başlık Öner → çoklu seç → ✨ <b>Seçilenleri Üret</b>'e bas.</p>
+      </div>
+    </section>
+
+    <!-- ============ POOL VIEW ============ -->
+    <section class="view" id="view-pool" role="tabpanel" hidden>
+      <div class="pool-toolbar">
+        <input type="search" id="p-search" placeholder="🔎 Havuzda ara..." />
+        <div class="spacer"></div>
+        <span class="pool-sel-info" id="p-sel-info"></span>
+        <button class="btn primary" id="p-build" disabled>✨ Seçilenleri Üret</button>
+        <button class="btn ghost" id="p-clear-sel">Seçimi Temizle</button>
+      </div>
+      <div class="pool-areas" id="p-areas" role="group" aria-label="Alan filtresi"></div>
+      <div class="pool-list" id="p-list"></div>
+      <div class="empty" id="p-empty" hidden>
+        <div class="empty-art">🔎</div>
+        <h3>Sonuç bulunamadı</h3>
+        <p>Farklı arama terimi deneyin veya alan filtresini değiştirin.</p>
       </div>
     </section>
 
