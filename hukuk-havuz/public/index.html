@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hukuk İçerik Havuzu</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='52' font-size='52'%3E📚%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-icon">📚</span>
+      <div>
+        <h1>Hukuk İçerik Havuzu</h1>
+        <p>AI destekli konu önerisi · Av. Yalın Anlatır</p>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span class="total-badge" id="total-badge">0 fikir</span>
+      <button class="icon-btn" id="btn-settings" title="Ayarlar">⚙️</button>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <!-- Alan filtreleri -->
+    <div class="area-bar" id="area-bar" role="group" aria-label="Alan filtresi">
+      <button class="area-chip is-active" data-area="">
+        Tümü <span class="chip-count" id="chip-count-all">0</span>
+      </button>
+    </div>
+
+    <!-- Araç çubuğu -->
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="🔎 Fikirlerde ara…" autocomplete="off" />
+      <div class="suggest-row">
+        <select id="suggest-area">
+          <option value="aile">Aile Hukuku</option>
+          <option value="ceza">Ceza Hukuku</option>
+          <option value="is">İş Hukuku</option>
+          <option value="tazminat">Tazminat Hukuku</option>
+          <option value="kira">Kira / Gayrimenkul</option>
+          <option value="tuketici">Tüketici Hukuku</option>
+          <option value="miras">Miras Hukuku</option>
+          <option value="kvkk">KVKK / Dijital</option>
+          <option value="borclar">Borçlar / Sözleşmeler</option>
+          <option value="icra">İcra ve İflas</option>
+          <option value="idare">İdare Hukuku</option>
+          <option value="anayasa">Anayasa Hukuku</option>
+        </select>
+        <button class="btn primary" id="suggest-btn">➕ Fikir Öner</button>
+      </div>
+    </div>
+
+    <!-- Fikir listesi -->
+    <div id="ideas-list"></div>
+    <div class="empty" id="empty" hidden>
+      <div class="empty-art">💡</div>
+      <h3>Henüz fikir yok</h3>
+      <p>Bir alan seçip <b>➕ Fikir Öner</b>'e bas.<br>AI 6–8 başlık önerir ve burada birikir.</p>
+    </div>
+    <div class="empty" id="no-results" hidden>
+      <div class="empty-art">🔎</div>
+      <h3>Sonuç bulunamadı</h3>
+      <p>Farklı arama terimi dene veya alan filtresini kaldır.</p>
+    </div>
+
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- Ayarlar modal -->
+  <div class="modal" id="modal-settings" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-dialog" role="dialog" aria-modal="true">
+      <header class="modal-head">
+        <h2>⚙️ Ayarlar</h2>
+        <button class="icon-btn" data-close>✕</button>
+      </header>
+      <div class="modal-body">
+        <label class="field">
+          <span class="label">Anthropic API Anahtarı</span>
+          <input type="password" id="s-api-key" placeholder="sk-ant-…" autocomplete="off" />
+          <span class="hint">Sadece tarayıcında saklanır, hiçbir sunucuya gitmez.</span>
+        </label>
+        <label class="field">
+          <span class="label">Model</span>
+          <select id="s-model">
+            <option value="claude-haiku-4-5-20251001">claude-haiku · en ucuz (önerilen)</option>
+            <option value="claude-sonnet-4-6">claude-sonnet · daha kaliteli</option>
+            <option value="claude-opus-4-7">claude-opus · en iyi</option>
+          </select>
+        </label>
+      </div>
+      <footer class="modal-foot">
+        <button class="btn ghost" data-close>İptal</button>
+        <button class="btn primary" id="s-save">💾 Kaydet</button>
+      </footer>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
