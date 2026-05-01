@@ -2,268 +2,153 @@
 <html lang="tr">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0b1220" />
-  <title>Av. Yalın Anlatır · Script Studio</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='52' font-size='52'%3E%E2%9A%96%EF%B8%8F%3C/text%3E%3C/svg%3E" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tesla Light Show Maker</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
-      <span class="brand-mark" aria-hidden="true">⚖️</span>
+      <span class="logo">⚡</span>
       <div class="brand-text">
-        <h1>Av. Yalın Anlatır</h1>
-        <p>Script Studio · Shorts / Reels / TikTok</p>
+        <h1>Tesla Light Show Maker</h1>
+        <span class="tag">Custom · Beat-sync · Web tabanlı</span>
       </div>
     </div>
-    <nav class="tabs" role="tablist">
-      <button class="tab is-active" data-tab="editor" role="tab" aria-selected="true">✍️ Yeni</button>
-      <button class="tab" data-tab="results" role="tab" aria-selected="false">
-        📦 Sonuçlar <span class="count" id="resultsCount">0</span>
-      </button>
-      <button class="tab" data-tab="archive" role="tab" aria-selected="false">
-        🗂️ Arşiv <span class="count" id="archiveCount">0</span>
-      </button>
-      <button class="icon-btn" id="btn-settings" title="Ayarlar" aria-label="Ayarlar">⚙️</button>
-    </nav>
+    <div class="actions">
+      <button id="loadAudioBtn" title="Şarkı yükle (mp3 / wav / m4a / ogg)">🎵 Şarkı</button>
+      <input type="file" id="audioFile" accept="audio/*" hidden />
+      <button id="autoGenBtn" class="primary" title="Beat'leri analiz et ve seçili pattern ile show üret">✨ Otomatik Üret</button>
+      <button id="clearBtn" title="Tüm kanalları sıfırla">🗑 Temizle</button>
+      <span class="sep"></span>
+      <button id="exportFseqBtn" title="Tesla için lightshow.fseq indir">⤓ .fseq</button>
+      <button id="exportWavBtn" title="lightshow.wav indir">⤓ .wav</button>
+      <span class="sep"></span>
+      <button id="saveProjectBtn" title="Projeyi JSON olarak indir">💾 Proje</button>
+      <button id="loadProjectBtn" title="JSON proje aç">📂 Aç</button>
+      <input type="file" id="projectFile" accept=".json,application/json" hidden />
+    </div>
   </header>
 
-  <main class="container">
+  <main class="workspace">
+    <section class="left-pane">
+      <div class="visualizer card">
+        <header class="card-h">
+          <h3>Canlı Önizleme</h3>
+          <span id="frameDisplay" class="muted small">frame 0 / 0</span>
+        </header>
+        <div class="svg-wrap">
+          <svg id="teslaSvg" viewBox="0 0 600 320" xmlns="http://www.w3.org/2000/svg" aria-label="Tesla üstten görünüm">
+            <rect x="120" y="40" width="360" height="240" rx="80" ry="80" class="body" />
+            <rect x="200" y="80" width="200" height="160" rx="40" ry="40" class="cabin" />
+            <line x1="300" y1="80" x2="300" y2="240" class="cabin-line" />
 
-    <!-- ============ EDITOR VIEW ============ -->
-    <section class="view is-active" id="view-editor" role="tabpanel">
-      <div class="grid">
+            <circle data-ch="6"  cx="160" cy="60"  r="12" class="light headlight" data-name="Far Sol İç" />
+            <circle data-ch="7"  cx="135" cy="68"  r="10" class="light headlight" data-name="Far Sol Dış" />
+            <circle data-ch="8"  cx="440" cy="60"  r="12" class="light headlight" data-name="Far Sağ İç" />
+            <circle data-ch="9"  cx="465" cy="68"  r="10" class="light headlight" data-name="Far Sağ Dış" />
+            <rect   data-ch="10" x="270" y="46"   width="60" height="6" rx="3" class="light highbeam" data-name="Uzun Far" />
+            <rect   data-ch="11" x="180" y="48"   width="40" height="4" rx="2" class="light fog" data-name="Sis Sol" />
+            <rect   data-ch="11" x="380" y="48"   width="40" height="4" rx="2" class="light fog" data-name="Sis Sağ" />
 
-        <div class="card form-card">
-          <div class="card-head">
-            <h2>Video Metni</h2>
-            <div class="head-actions">
-              <button class="btn ghost" id="btn-ideas" title="AI ile konu önerisi al">💡 Fikir Öner</button>
-              <button class="btn ghost" id="btn-clear" title="Alanları temizle">🧹 Temizle</button>
-              <button class="btn ghost" id="btn-sample" title="Örnek doldur">✨ Örnek</button>
-            </div>
-          </div>
+            <rect data-ch="12" x="135" y="260" width="60" height="14" rx="4" class="light tail" data-name="Stop Sol" />
+            <rect data-ch="13" x="405" y="260" width="60" height="14" rx="4" class="light tail" data-name="Stop Sağ" />
+            <rect data-ch="14" x="270" y="266" width="60" height="6"  rx="3" class="light reverse" data-name="Geri Vites" />
+            <rect data-ch="15" x="285" y="276" width="30" height="4"  rx="2" class="light plate" data-name="Plaka" />
 
-          <label class="field">
-            <span class="label">Konu <em>(başlığı yaz, ⚡ ile geri kalanını AI doldursun)</em></span>
-            <div class="input-row">
-              <input type="text" id="f-topic" placeholder="Örn. Üst araması ile araç araması arasındaki fark" maxlength="120" />
-              <button type="button" class="btn primary gen-btn" id="btn-gen" title="AI ile içerik + reels + hashtag üret">⚡ Üret</button>
-            </div>
-            <span class="hint"><span id="c-topic">0</span>/120 karakter · <span class="muted">Üret düğmesi içerik, reels ve hashtag'leri otomatik doldurur</span></span>
-          </label>
+            <rect data-ch="0" x="115" y="48"  width="14" height="60" rx="6" class="light outline" data-name="Outline Sol Ön" />
+            <rect data-ch="1" x="471" y="48"  width="14" height="60" rx="6" class="light outline" data-name="Outline Sağ Ön" />
+            <rect data-ch="2" x="115" y="130" width="14" height="60" rx="6" class="light outline" data-name="Outline Sol Yan" />
+            <rect data-ch="3" x="471" y="130" width="14" height="60" rx="6" class="light outline" data-name="Outline Sağ Yan" />
+            <rect data-ch="4" x="115" y="212" width="14" height="60" rx="6" class="light outline" data-name="Outline Sol Arka" />
+            <rect data-ch="5" x="471" y="212" width="14" height="60" rx="6" class="light outline" data-name="Outline Sağ Arka" />
 
-          <label class="field">
-            <span class="label">İçerik <em>(okuma süresi hedefi: 20–30 sn)</em></span>
-            <textarea id="f-content" rows="5" placeholder="3–5 kısa cümle. Son cümle 'Kısacası:' ile başlasın."></textarea>
-            <span class="hint">
-              <span id="c-words">0</span> kelime · <span id="c-read">0 sn</span> okuma ·
-              <span id="c-badge" class="badge">—</span>
-            </span>
-          </label>
+            <circle data-ch="16" cx="128" cy="40"  r="6" class="light signal" data-name="Sinyal Sol" />
+            <circle data-ch="17" cx="472" cy="40"  r="6" class="light signal" data-name="Sinyal Sağ" />
+            <circle data-ch="18" cx="128" cy="160" r="5" class="light signal" data-name="Yan Sinyal Sol" />
+            <circle data-ch="19" cx="472" cy="160" r="5" class="light signal" data-name="Yan Sinyal Sağ" />
 
-          <label class="field">
-            <span class="label">🎬 Reels Açıklaması <em>(emojili, satır satır)</em></span>
-            <textarea id="f-reels" rows="6" placeholder="🚓 Üst mü araç mı?&#10;👤 Üst: kişi&#10;🚗 Araç: tüm taşıt&#10;⚖️ Araç araması daha sıkı kurallı"></textarea>
-            <div class="emoji-row" id="emoji-row" aria-label="Emoji ekle"></div>
-          </label>
-
-          <label class="field">
-            <span class="label">#Hashtag'ler</span>
-            <input type="text" id="f-tags" placeholder="#arama #cezahukuku #yalınanlatır #avukat" />
-            <span class="hint">Öneriler:
-              <button type="button" class="chip" data-tag="#hukuk">#hukuk</button>
-              <button type="button" class="chip" data-tag="#yalınanlatır">#yalınanlatır</button>
-              <button type="button" class="chip" data-tag="#avukat">#avukat</button>
-              <button type="button" class="chip" data-tag="#cezahukuku">#cezahukuku</button>
-              <button type="button" class="chip" data-tag="#ailehukuku">#ailehukuku</button>
-              <button type="button" class="chip" data-tag="#işhukuku">#işhukuku</button>
-              <button type="button" class="chip" data-tag="#kvkk">#kvkk</button>
-              <button type="button" class="chip" data-tag="#tutuklama">#tutuklama</button>
-            </span>
-          </label>
+            <rect data-ch="20" x="200" y="105" width="6" height="40" class="light closure" data-name="Kapı Ön Sol" />
+            <rect data-ch="21" x="394" y="105" width="6" height="40" class="light closure" data-name="Kapı Ön Sağ" />
+            <rect data-ch="22" x="200" y="175" width="6" height="40" class="light closure" data-name="Kapı Arka Sol" />
+            <rect data-ch="23" x="394" y="175" width="6" height="40" class="light closure" data-name="Kapı Arka Sağ" />
+            <rect data-ch="24" x="208" y="100" width="38" height="4" class="light closure" data-name="Pencere Sol Ön" />
+            <rect data-ch="25" x="354" y="100" width="38" height="4" class="light closure" data-name="Pencere Sağ Ön" />
+            <rect data-ch="26" x="270" y="244" width="60" height="8" class="light closure" data-name="Bagaj" />
+            <rect data-ch="27" x="270" y="68"  width="60" height="8" class="light closure" data-name="Frunk" />
+            <circle data-ch="28" cx="105" cy="240" r="5" class="light closure" data-name="Şarj Portu" />
+            <rect data-ch="29" x="178" y="135" width="6" height="22" class="light closure" data-name="Aynalar" />
+          </svg>
         </div>
-
-        <div class="card preview-card">
-          <div class="card-head">
-            <h2>Önizleme</h2>
-            <div class="head-actions">
-              <button class="btn primary" id="btn-copy-tc" title="Sadece konu başlığı + içerik (etiketsiz)">📝 Konu+İçerik</button>
-              <button class="btn primary" id="btn-copy-reels" title="Sadece reels açıklaması + hashtag (etiketsiz)">🎬 Reels</button>
-              <button class="btn" id="btn-copy" title="Tam şablon (etiketli)">📋 Tümü</button>
-              <button class="btn" id="btn-save">💾 Arşive</button>
-            </div>
-          </div>
-          <pre class="preview" id="preview" aria-live="polite"></pre>
-          <p class="save-hint" id="save-hint"></p>
-        </div>
-
       </div>
-    </section>
 
-    <!-- ============ RESULTS VIEW (toplu üretim) ============ -->
-    <section class="view" id="view-results" role="tabpanel" hidden>
-      <div class="archive-toolbar">
-        <h2 class="view-title">📦 Üretilen Sonuçlar</h2>
-        <div class="spacer"></div>
-        <button class="btn ghost" id="btn-results-archive-all" title="Hepsini arşive kaydet">💾 Hepsini Arşivle</button>
-        <button class="btn ghost" id="btn-results-clear" title="Sonuçlar listesini temizle">🧹 Tümünü Sil</button>
+      <div class="card transport">
+        <button id="playBtn" class="big">▶</button>
+        <button id="stopBtn" class="big">■</button>
+        <input type="range" id="seek" min="0" max="1000" value="0" step="1" />
+        <span id="timeDisplay" class="mono">0:00.0 / 0:00.0</span>
+        <span id="bpmDisplay" class="badge">BPM: --</span>
+        <span id="beatsDisplay" class="badge">beats: 0</span>
       </div>
-      <div class="results-list" id="results-list"></div>
-      <div class="empty" id="results-empty" hidden>
-        <div class="empty-art">📦</div>
-        <h3>Henüz üretilen sonuç yok</h3>
-        <p>💡 <b>Fikir Öner</b>'i aç → alan seç → ⚡ Başlık Öner → çoklu seç → ✨ <b>Seçilenleri Üret</b>'e bas.</p>
-      </div>
-    </section>
 
-    <!-- ============ ARCHIVE VIEW ============ -->
-    <section class="view" id="view-archive" role="tabpanel" hidden>
-      <div class="archive-toolbar">
-        <input type="search" id="a-search" placeholder="🔎 Arşivde ara (konu, içerik, hashtag)" />
-        <div class="spacer"></div>
-        <button class="btn ghost" id="btn-export">⤓ Dışa Aktar (JSON)</button>
-        <button class="btn ghost" id="btn-import">⤒ İçe Aktar</button>
-        <input type="file" id="file-import" accept="application/json" hidden />
-      </div>
-      <div class="archive-list" id="archive-list"></div>
-      <div class="empty" id="archive-empty" hidden>
-        <div class="empty-art">🗂️</div>
-        <h3>Arşiv boş</h3>
-        <p>Editörde bir video metni oluşturup <b>Arşive Kaydet</b>'e bas.</p>
-      </div>
-    </section>
-
-  </main>
-
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
-
-  <!-- ============ IDEAS MODAL (havuz + çoklu seçim) ============ -->
-  <div class="modal" id="modal-ideas" hidden aria-hidden="true">
-    <div class="modal-backdrop" data-close></div>
-    <div class="modal-dialog wide" role="dialog" aria-labelledby="ideas-title" aria-modal="true">
-      <header class="modal-head">
-        <h2 id="ideas-title">💡 Fikir Havuzu</h2>
-        <button class="icon-btn" data-close aria-label="Kapat">✕</button>
-      </header>
-      <div class="modal-body">
-        <div class="ideas-row">
-          <label class="field" style="flex:1 1 220px; margin:0;">
-            <span class="label">Hukuk Alanı</span>
-            <select id="i-area">
-              <option value="karisik">Karışık (farklı alanlardan)</option>
-              <option value="aile">Aile Hukuku</option>
-              <option value="ceza">Ceza Hukuku</option>
-              <option value="is">İş Hukuku</option>
-              <option value="tazminat">Tazminat Hukuku</option>
-              <option value="kira">Kira / Gayrimenkul</option>
-              <option value="tuketici">Tüketici Hukuku</option>
-              <option value="miras">Miras Hukuku</option>
-              <option value="kvkk">KVKK / Dijital</option>
-              <option value="borclar">Borçlar / Sözleşmeler</option>
+      <div class="card pattern-card">
+        <header class="card-h"><h3>Otomatik Pattern</h3></header>
+        <div class="pattern-grid">
+          <label>Stil
+            <select id="patternStyle">
+              <option value="strobe">Strobe — tüm outline beat'te</option>
+              <option value="chase" selected>Chase — sıralı dönen</option>
+              <option value="wave">Wave — ön → yan → arka</option>
+              <option value="random">Random — rastgele subset</option>
+              <option value="beatdrop">Beat Drop — 4'lükte patlama</option>
+              <option value="symmetric">Symmetric — sol/sağ ayna</option>
             </select>
           </label>
-          <button class="btn primary" id="i-gen" title="Bu alandan 6-8 başlık öner">⚡ Başlık Öner</button>
-          <button class="btn ghost" id="i-add-more" title="Mevcut listeye yeni öneriler ekle">➕ Daha Öner</button>
+          <label>Hassasiyet <span id="sensVal" class="muted small">5</span>
+            <input type="range" id="sensitivity" min="1" max="10" value="5" />
+          </label>
+          <label>Beat süresi (frame)
+            <input type="number" id="pulseLen" min="1" max="20" value="2" />
+          </label>
+          <label class="check"><input type="checkbox" id="includeClosures" />
+            Closure'ları (kapı/pencere/bagaj) dahil et
+          </label>
+          <label class="check"><input type="checkbox" id="autoSignals" checked />
+            Sinyalleri ritime kat
+          </label>
         </div>
-
-        <p class="hint">
-          Önerilenleri işaretle (çoklu seçim), sonra ✨ <b>Seçilenleri Üret</b>'e bas. Her seçim sırayla üretilir, <b>📦 Sonuçlar</b> sekmesinde görünür.
-        </p>
-
-        <div class="ideas-list" id="ideas-list"></div>
-        <p class="ideas-empty" id="ideas-empty">Henüz öneri yok. ⚡ Başlık Öner'e bas.</p>
       </div>
-      <footer class="modal-foot ideas-foot" id="ideas-foot" hidden>
-        <label class="check-row">
-          <input type="checkbox" id="i-select-all" />
-          <span>Tümünü seç</span>
-        </label>
-        <span class="ideas-count" id="i-count">0 seçili</span>
-        <div class="spacer"></div>
-        <button class="btn primary" id="i-build" disabled>✨ Seçilenleri Üret</button>
-      </footer>
-    </div>
-  </div>
+    </section>
 
-  <!-- ============ SETTINGS MODAL ============ -->
-  <div class="modal" id="modal-settings" hidden aria-hidden="true">
-    <div class="modal-backdrop" data-close></div>
-    <div class="modal-dialog" role="dialog" aria-labelledby="settings-title" aria-modal="true">
-      <header class="modal-head">
-        <h2 id="settings-title">⚙️ Ayarlar</h2>
-        <button class="icon-btn" data-close aria-label="Kapat">✕</button>
+    <section class="right-pane card">
+      <header class="card-h">
+        <h3>Zaman Çizelgesi <span class="muted small">(50 ms grid · tıkla / sürükle)</span></h3>
+        <div class="zoom">
+          <button id="zoomOut">−</button>
+          <span id="zoomLabel" class="mono">8 px / frame</span>
+          <button id="zoomIn">＋</button>
+        </div>
       </header>
-      <div class="modal-body">
-        <label class="field">
-          <span class="label">Anthropic API Anahtarı</span>
-          <input type="password" id="s-api-key" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
-          <span class="hint">
-            Sadece senin tarayıcında (<code>localStorage</code>) saklanır. Hiçbir sunucuya gitmez.
-            <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">Anahtar al →</a>
-          </span>
-        </label>
-        <label class="field">
-          <span class="label">Model</span>
-          <select id="s-model">
-            <option value="claude-opus-4-7">claude-opus-4-7 · en iyi (varsayılan)</option>
-            <option value="claude-sonnet-4-6">claude-sonnet-4-6 · daha hızlı</option>
-            <option value="claude-haiku-4-5">claude-haiku-4-5 · en ucuz</option>
-          </select>
-          <span class="hint">Opus = en kaliteli metin. Haiku = hızlı ve ucuz, günlük üretim için yeterli.</span>
-        </label>
+      <div id="timelineWrap">
+        <div class="ruler-wrap">
+          <canvas id="rulerCanvas" height="22"></canvas>
+        </div>
+        <div class="wave-wrap">
+          <canvas id="waveformCanvas" height="56"></canvas>
+        </div>
+        <div class="grid-scroll" id="gridScroll">
+          <div class="channel-labels" id="channelLabels"></div>
+          <canvas id="gridCanvas"></canvas>
+          <div class="playhead" id="playhead"></div>
+        </div>
       </div>
-      <footer class="modal-foot">
-        <button class="btn ghost" data-close>İptal</button>
-        <button class="btn primary" id="s-save">💾 Kaydet</button>
+      <footer class="hint">
+        <span>💡 İpucu: Hücreye <b>tıkla</b> aç/kapat · <b>sürükle</b> ile boya · <b>Shift+sürükle</b> ile sil</span>
       </footer>
-    </div>
-  </div>
+    </section>
+  </main>
 
-  <template id="archive-card-tpl">
-    <article class="a-card">
-      <header class="a-head">
-        <h3 class="a-title"></h3>
-        <time class="a-date"></time>
-      </header>
-      <p class="a-content"></p>
-      <p class="a-tags"></p>
-      <footer class="a-actions">
-        <button class="btn primary a-copy-tc" title="Konu + İçerik (etiketsiz)">📝 Konu+İçerik</button>
-        <button class="btn primary a-copy-reels" title="Reels açıklaması + hashtag (etiketsiz)">🎬 Reels</button>
-        <button class="btn a-copy" title="Tam şablon (etiketli)">📋 Tümü</button>
-        <button class="btn a-edit">✏️ Düzenle</button>
-        <button class="btn ghost a-del">🗑️</button>
-      </footer>
-    </article>
-  </template>
-
-  <template id="result-card-tpl">
-    <article class="r-card">
-      <header class="r-head">
-        <h3 class="r-title"></h3>
-        <time class="r-date"></time>
-      </header>
-      <div class="r-block">
-        <span class="r-label">Konu + İçerik <em>(etiketsiz kopyalanır)</em></span>
-        <p class="r-content"></p>
-      </div>
-      <div class="r-block">
-        <span class="r-label">🎬 Reels Açıklaması <em>(etiketsiz kopyalanır)</em></span>
-        <pre class="r-reels"></pre>
-        <p class="r-tags"></p>
-      </div>
-      <footer class="r-actions">
-        <button class="btn primary r-copy-tc">📝 Konu+İçerik</button>
-        <button class="btn primary r-copy-reels">🎬 Reels</button>
-        <button class="btn r-edit" title="Editöre yükle">✏️ Editöre At</button>
-        <button class="btn r-save" title="Arşive kaydet">💾 Arşivle</button>
-        <button class="btn ghost r-del" title="Listeden sil">🗑️</button>
-      </footer>
-    </article>
-  </template>
-
+  <div id="toast" class="toast" hidden></div>
   <script src="app.js"></script>
 </body>
 </html>

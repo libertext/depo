@@ -1,1018 +1,832 @@
-/* Av. Yalın Anlatır · Script Studio
-   Vanilla JS, no deps. Data lives in localStorage. */
+/* Tesla Light Show Maker
+   Web tabanlı, custom · ritme göre otomatik beat-sync show üretici.
+   Vanilla JS — no deps. Audio: Web Audio API. Export: .fseq v2.0 + .wav. */
 
-const STORAGE_KEY  = 'yalin-anlatir.archive.v1';
-const DRAFT_KEY    = 'yalin-anlatir.draft.v1';
-const SETTINGS_KEY = 'yalin-anlatir.settings.v1';
-const RESULTS_KEY  = 'yalin-anlatir.results.v1';
+(() => {
+  'use strict';
 
-const EMOJIS = ['⚖️','🚓','👮','🧑‍⚖️','📜','📝','🔒','🔓','💼','🏛️','👤','🚗','🚨','⏱️','📞','💰','🏠','👨‍👩‍👧','💍','📄','🚫','✅','❗','❓','💡','🎯'];
+  // ─────────────────────────────────────────────────────────────
+  //  Sabitler & kanal listesi
+  // ─────────────────────────────────────────────────────────────
+  const STEP_MS = 50;            // Tesla light show frame süresi
+  const MAX_CH  = 30;
 
-/* ---------------- Storage ---------------- */
-const db = {
-  list() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
-    catch { return []; }
-  },
-  save(items) { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); },
-  add(item) {
-    const items = db.list();
-    items.unshift(item);
-    db.save(items);
-  },
-  update(id, patch) {
-    const items = db.list().map(x => x.id === id ? { ...x, ...patch, updatedAt: Date.now() } : x);
-    db.save(items);
-  },
-  remove(id) {
-    db.save(db.list().filter(x => x.id !== id));
-  },
-  find(id) { return db.list().find(x => x.id === id); }
-};
+  const CHANNELS = [
+    { id: 0,  name: 'Outline Sol Ön',     group: 'outline'   },
+    { id: 1,  name: 'Outline Sağ Ön',     group: 'outline'   },
+    { id: 2,  name: 'Outline Sol Yan',    group: 'outline'   },
+    { id: 3,  name: 'Outline Sağ Yan',    group: 'outline'   },
+    { id: 4,  name: 'Outline Sol Arka',   group: 'outline'   },
+    { id: 5,  name: 'Outline Sağ Arka',   group: 'outline'   },
+    { id: 6,  name: 'Far Sol İç',         group: 'headlight' },
+    { id: 7,  name: 'Far Sol Dış',        group: 'headlight' },
+    { id: 8,  name: 'Far Sağ İç',         group: 'headlight' },
+    { id: 9,  name: 'Far Sağ Dış',        group: 'headlight' },
+    { id: 10, name: 'Uzun Far',           group: 'headlight' },
+    { id: 11, name: 'Sis Far',            group: 'headlight' },
+    { id: 12, name: 'Stop Sol',           group: 'tail'      },
+    { id: 13, name: 'Stop Sağ',           group: 'tail'      },
+    { id: 14, name: 'Geri Vites',         group: 'tail'      },
+    { id: 15, name: 'Plaka',              group: 'tail'      },
+    { id: 16, name: 'Sinyal Sol',         group: 'signal'    },
+    { id: 17, name: 'Sinyal Sağ',         group: 'signal'    },
+    { id: 18, name: 'Yan Sinyal Sol',     group: 'signal'    },
+    { id: 19, name: 'Yan Sinyal Sağ',     group: 'signal'    },
+    { id: 20, name: 'Kapı Ön Sol',        group: 'closure'   },
+    { id: 21, name: 'Kapı Ön Sağ',        group: 'closure'   },
+    { id: 22, name: 'Kapı Arka Sol',      group: 'closure'   },
+    { id: 23, name: 'Kapı Arka Sağ',      group: 'closure'   },
+    { id: 24, name: 'Pencere Sol Ön',     group: 'closure'   },
+    { id: 25, name: 'Pencere Sağ Ön',     group: 'closure'   },
+    { id: 26, name: 'Bagaj',              group: 'closure'   },
+    { id: 27, name: 'Frunk',              group: 'closure'   },
+    { id: 28, name: 'Şarj Portu',         group: 'closure'   },
+    { id: 29, name: 'Aynalar',            group: 'closure'   },
+  ];
 
-/* ---------------- Helpers ---------------- */
-const $ = (sel, root = document) => root.querySelector(sel);
-const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+  // ─────────────────────────────────────────────────────────────
+  //  Uygulama durumu
+  // ─────────────────────────────────────────────────────────────
+  const state = {
+    audioBuffer: null,              // AudioBuffer
+    audioName: '',
+    duration: 0,
+    frameCount: 0,
+    frames: [],                     // frames[f] = Uint8Array(MAX_CH)
+    beats: [],                      // saniye cinsinden
+    bpm: null,
+    isPlaying: false,
+    audioCtx: null,
+    sourceNode: null,
+    startedAt: 0,                   // audioCtx.currentTime - offset when started
+    startOffset: 0,                 // saniye, pause/seek offset
+    pxPerFrame: 8,
+    rowHeight: 22,
+  };
 
-const newId = () => 'y' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
-const fmtDate = (ts) => {
-  const d = new Date(ts);
-  return d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' })
-       + ' · ' + d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-};
-
-const countWords = (s) => (s.trim().match(/\S+/g) || []).length;
-
-function toast(msg) {
-  const t = $('#toast');
-  t.textContent = msg;
-  t.classList.add('is-show');
-  clearTimeout(toast._t);
-  toast._t = setTimeout(() => t.classList.remove('is-show'), 1800);
-}
-
-function copyText(text) {
-  if (navigator.clipboard?.writeText) {
-    return navigator.clipboard.writeText(text);
+  // ─────────────────────────────────────────────────────────────
+  //  Yardımcılar
+  // ─────────────────────────────────────────────────────────────
+  function fmtTime(s) {
+    if (!isFinite(s)) s = 0;
+    const m = Math.floor(s / 60);
+    const ss = Math.floor(s % 60);
+    const ds = Math.floor((s * 10) % 10);
+    return `${m}:${String(ss).padStart(2, '0')}.${ds}`;
   }
-  return new Promise((resolve, reject) => {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    try { document.execCommand('copy'); resolve(); }
-    catch (e) { reject(e); }
-    finally { document.body.removeChild(ta); }
-  });
-}
 
-/* ---------------- Template assembly ---------------- */
-function buildOutput({ topic, content, reels, tags }) {
-  const parts = [];
-  parts.push(`Konu: ${topic || ''}`.trimEnd());
-  parts.push('');
-  parts.push(`İçerik: ${content || ''}`.trimEnd());
-  parts.push('');
-  parts.push('🎬 TikTok–Reels Açıklaması (emojili):');
-  parts.push('');
-  parts.push((reels || '').trimEnd());
-  parts.push('');
-  parts.push((tags || '').trim());
-  return parts.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd();
-}
+  let toastTimer;
+  function toast(msg, kind = '') {
+    const el = $('#toast');
+    el.className = 'toast ' + kind;
+    el.textContent = msg;
+    el.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => (el.hidden = true), 2500);
+  }
 
-/* "Konu + içerik" — etiketsiz, sadece başlık ve içerik metni */
-function buildTopicContent({ topic, content }) {
-  return [(topic || '').trim(), '', (content || '').trim()]
-    .join('\n').replace(/\n{3,}/g, '\n\n').trim();
-}
-
-/* "Reels açıklaması" — etiketsiz, sadece emojili blok + hashtag */
-function buildReelsCaption({ reels, tags }) {
-  return [(reels || '').trim(), '', (tags || '').trim()]
-    .join('\n').replace(/\n{3,}/g, '\n\n').trim();
-}
-
-/* ---------------- Editor state ---------------- */
-const editor = {
-  els: {},
-  editingId: null,
-
-  init() {
-    this.els = {
-      topic: $('#f-topic'),
-      content: $('#f-content'),
-      reels: $('#f-reels'),
-      tags: $('#f-tags'),
-      preview: $('#preview'),
-      cTopic: $('#c-topic'),
-      cWords: $('#c-words'),
-      cRead: $('#c-read'),
-      cBadge: $('#c-badge'),
-      saveHint: $('#save-hint'),
-    };
-
-    // emoji buttons
-    const row = $('#emoji-row');
-    EMOJIS.forEach(e => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = e;
-      b.title = 'Ekle: ' + e;
-      b.addEventListener('click', () => this.insertAtCursor(this.els.reels, e + ' '));
-      row.appendChild(b);
-    });
-
-    // hashtag chips
-    $$('.chip[data-tag]').forEach(c => {
-      c.addEventListener('click', () => {
-        const cur = this.els.tags.value.trim();
-        const tag = c.dataset.tag;
-        if (cur.includes(tag)) return;
-        this.els.tags.value = cur ? cur + ' ' + tag : tag;
-        this.render();
-        this.saveDraft();
-      });
-    });
-
-    // input listeners
-    ['topic','content','reels','tags'].forEach(k => {
-      this.els[k].addEventListener('input', () => { this.render(); this.saveDraft(); });
-    });
-
-    // buttons
-    $('#btn-copy').addEventListener('click', () => this.copy());
-    $('#btn-copy-tc').addEventListener('click', () => this.copyTopicContent());
-    $('#btn-copy-reels').addEventListener('click', () => this.copyReels());
-    $('#btn-save').addEventListener('click', () => this.save());
-    $('#btn-clear').addEventListener('click', () => this.clear());
-    $('#btn-sample').addEventListener('click', () => this.loadSample());
-    $('#btn-gen').addEventListener('click', () => this.generate());
-
-    // keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
-      if (!$('#view-editor').classList.contains('is-active')) return;
-      const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); this.save(); }
-      if (mod && e.shiftKey && e.key.toLowerCase() === 'c') { e.preventDefault(); this.copy(); }
-    });
-
-    this.loadDraft();
-    this.render();
-  },
-
-  insertAtCursor(ta, text) {
-    const s = ta.selectionStart ?? ta.value.length;
-    const e = ta.selectionEnd   ?? ta.value.length;
-    ta.value = ta.value.slice(0, s) + text + ta.value.slice(e);
-    ta.focus();
-    ta.selectionStart = ta.selectionEnd = s + text.length;
-    this.render();
-    this.saveDraft();
-  },
-
-  getData() {
-    return {
-      topic:   this.els.topic.value.trim(),
-      content: this.els.content.value.trim(),
-      reels:   this.els.reels.value.replace(/\s+$/,''),
-      tags:    this.els.tags.value.trim(),
-    };
-  },
-
-  setData(d = {}) {
-    this.els.topic.value   = d.topic   || '';
-    this.els.content.value = d.content || '';
-    this.els.reels.value   = d.reels   || '';
-    this.els.tags.value    = d.tags    || '';
-    this.render();
-  },
-
-  render() {
-    const d = this.getData();
-    this.els.preview.textContent = buildOutput(d);
-
-    // counters
-    this.els.cTopic.textContent = d.topic.length;
-
-    const words = countWords(d.content);
-    const readSec = Math.round(words / 2.6); // ~2.6 words/sec TR speech
-    this.els.cWords.textContent = words;
-    this.els.cRead.textContent  = readSec + ' sn';
-
-    const badge = this.els.cBadge;
-    badge.classList.remove('ok','warn','bad');
-    if (words === 0) { badge.textContent = '—'; }
-    else if (readSec >= 20 && readSec <= 30) { badge.textContent = 'İdeal'; badge.classList.add('ok'); }
-    else if (readSec >= 15 && readSec <= 35) { badge.textContent = 'Yakın';  badge.classList.add('warn'); }
-    else if (readSec < 15)                   { badge.textContent = 'Kısa';  badge.classList.add('bad'); }
-    else                                     { badge.textContent = 'Uzun';  badge.classList.add('bad'); }
-
-    this.els.saveHint.textContent = this.editingId ? '✏️ Mevcut kayıt düzenleniyor.' : '';
-  },
-
-  saveDraft() {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...this.getData(), editingId: this.editingId }));
-  },
-
-  loadDraft() {
-    try {
-      const raw = localStorage.getItem(DRAFT_KEY);
-      if (!raw) return;
-      const d = JSON.parse(raw);
-      this.editingId = d.editingId || null;
-      this.setData(d);
-    } catch {}
-  },
-
-  async copy() {
-    const d = this.getData();
-    if (!d.topic && !d.content) { toast('Önce içerik gir'); return; }
-    try {
-      await copyText(buildOutput(d));
-      toast('📋 Tümü kopyalandı');
-    } catch { toast('Kopyalanamadı'); }
-  },
-
-  async copyTopicContent() {
-    const d = this.getData();
-    if (!d.topic && !d.content) { toast('Konu/içerik boş'); return; }
-    try {
-      await copyText(buildTopicContent(d));
-      toast('📝 Konu + İçerik kopyalandı');
-    } catch { toast('Kopyalanamadı'); }
-  },
-
-  async copyReels() {
-    const d = this.getData();
-    if (!d.reels && !d.tags) { toast('Reels/hashtag boş'); return; }
-    try {
-      await copyText(buildReelsCaption(d));
-      toast('🎬 Reels açıklaması kopyalandı');
-    } catch { toast('Kopyalanamadı'); }
-  },
-
-  save() {
-    const d = this.getData();
-    if (!d.topic || !d.content) { toast('Konu ve içerik gerekli'); return; }
-    const now = Date.now();
-    if (this.editingId) {
-      db.update(this.editingId, d);
-      toast('💾 Güncellendi');
-    } else {
-      db.add({ id: newId(), ...d, createdAt: now, updatedAt: now });
-      toast('💾 Arşive kaydedildi');
-    }
-    this.editingId = null;
-    archive.refresh();
-    this.saveDraft();
-    this.render();
-  },
-
-  clear() {
-    if (this.els.topic.value || this.els.content.value || this.els.reels.value || this.els.tags.value) {
-      if (!confirm('Tüm alanlar temizlensin mi?')) return;
-    }
-    this.editingId = null;
-    this.setData({});
-    this.saveDraft();
-    toast('🧹 Temizlendi');
-  },
-
-  async generate() {
-    const topic = this.els.topic.value.trim();
-    if (!topic) {
-      toast('Önce bir konu başlığı yaz');
-      this.els.topic.focus();
-      return;
-    }
-    const s = settings.load();
-    if (!s.apiKey) {
-      toast('Önce ⚙️ Ayarlar\'dan API anahtarı gir');
-      settings.open();
-      return;
-    }
-    const btn = $('#btn-gen');
-    const origLabel = btn.textContent;
-    btn.disabled = true;
-    btn.classList.add('is-loading');
-    btn.textContent = '⏳ Üretiliyor';
-    try {
-      const out = await ai.generate(topic, s);
-      this.els.content.value = out.content || '';
-      this.els.reels.value   = out.reels   || '';
-      this.els.tags.value    = out.tags    || '';
-      this.render();
-      this.saveDraft();
-      toast('⚡ Üretildi');
-    } catch (e) {
-      console.error(e);
-      toast('Üretim başarısız: ' + (e.message || 'bilinmeyen hata'));
-    } finally {
-      btn.disabled = false;
-      btn.classList.remove('is-loading');
-      btn.textContent = origLabel;
-    }
-  },
-
-  loadSample() {
-    this.editingId = null;
-    this.setData({
-      topic: 'Üst araması ile araç araması arasındaki fark',
-      content: 'Üst araması, kişinin üzerindeki eşyaların kontrolünü kapsar; araç araması ise taşıtın tamamını içerir. Araç araması genellikle daha geniş kapsamlıdır ve daha sıkı usul şartlarına tabidir. Her iki aramada da hukuka uygunluk (yetki, sebep, usul) denetlenir. Kısacası: Kapsam farklı, kurallar daha da önemlidir.',
-      reels: '🚓 Üst mü araç mı?\n\n👤 Üst: kişi\n🚗 Araç: tüm taşıt\n⚖️ Araç araması daha sıkı kurallı',
-      tags: '#arama #hukuk #cezahukuku #yalınanlatır #avukat',
-    });
-    this.saveDraft();
-  },
-
-  editFrom(item) {
-    this.editingId = item.id;
-    this.setData(item);
-    this.saveDraft();
-    tabs.show('editor');
-  },
-};
-
-/* ---------------- Archive ---------------- */
-const archive = {
-  init() {
-    $('#a-search').addEventListener('input', () => this.refresh());
-    $('#btn-export').addEventListener('click', () => this.exportAll());
-    $('#btn-import').addEventListener('click', () => $('#file-import').click());
-    $('#file-import').addEventListener('change', (e) => this.importFile(e));
-    this.refresh();
-  },
-
-  refresh() {
-    const q = $('#a-search').value.trim().toLowerCase();
-    const items = db.list().filter(it => {
-      if (!q) return true;
-      return (it.topic + ' ' + it.content + ' ' + (it.tags || '') + ' ' + (it.reels || ''))
-        .toLowerCase().includes(q);
-    });
-
-    $('#archiveCount').textContent = db.list().length;
-
-    const list = $('#archive-list');
-    list.innerHTML = '';
-    const empty = $('#archive-empty');
-
-    if (items.length === 0) {
-      empty.hidden = false;
-      if (q) {
-        empty.querySelector('h3').textContent = 'Sonuç yok';
-        empty.querySelector('p').textContent  = `"${q}" için arşivde kayıt bulunamadı.`;
-      } else {
-        empty.querySelector('h3').textContent = 'Arşiv boş';
-        empty.querySelector('p').innerHTML    = 'Editörde bir video metni oluşturup <b>Arşive Kaydet</b>\'e bas.';
+  function ensureFrames() {
+    state.frameCount = Math.max(1, Math.ceil(state.duration * 1000 / STEP_MS));
+    if (state.frames.length !== state.frameCount) {
+      const next = new Array(state.frameCount);
+      for (let i = 0; i < state.frameCount; i++) {
+        next[i] = state.frames[i] || new Uint8Array(MAX_CH);
       }
+      state.frames = next;
+    }
+  }
+
+  function clearFrames() {
+    for (let i = 0; i < state.frameCount; i++) {
+      state.frames[i] = new Uint8Array(MAX_CH);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  Audio yükle & dekode et
+  // ─────────────────────────────────────────────────────────────
+  async function loadAudioFile(file) {
+    if (!state.audioCtx) state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = await state.audioCtx.decodeAudioData(arrayBuffer.slice(0));
+    state.audioBuffer = buffer;
+    state.audioName = file.name.replace(/\.[^.]+$/, '');
+    state.duration = buffer.duration;
+    state.startOffset = 0;
+    ensureFrames();
+    drawWaveform();
+    drawRuler();
+    drawGrid();
+    updateTime();
+    updateFrameDisplay();
+    toast(`Yüklendi: ${file.name} · ${fmtTime(buffer.duration)}`, 'ok');
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  Beat tespiti (energy onset)
+  // ─────────────────────────────────────────────────────────────
+  function detectBeats(audioBuffer, sensitivity) {
+    const sr = audioBuffer.sampleRate;
+    const ch = audioBuffer.numberOfChannels;
+    const N  = audioBuffer.length;
+    const a = audioBuffer.getChannelData(0);
+    const b = ch > 1 ? audioBuffer.getChannelData(1) : null;
+
+    const win = 1024;
+    const hop = 512;
+    const energies = [];
+    for (let i = 0; i + win < N; i += hop) {
+      let s = 0;
+      for (let j = 0; j < win; j++) {
+        const v = b ? (a[i + j] + b[i + j]) * 0.5 : a[i + j];
+        s += v * v;
+      }
+      energies.push(Math.sqrt(s / win));
+    }
+    // adaptive threshold using local mean & std
+    const lookback = 24;
+    const baseMul = 1.10 + (10 - sensitivity) * 0.06;   // sens 10 → 1.10, sens 1 → 1.64
+    const minGap = 0.12; // s
+    const beats = [];
+    for (let i = lookback; i < energies.length; i++) {
+      let mean = 0;
+      for (let k = i - lookback; k < i; k++) mean += energies[k];
+      mean /= lookback;
+      let varSum = 0;
+      for (let k = i - lookback; k < i; k++) {
+        const d = energies[k] - mean;
+        varSum += d * d;
+      }
+      const std = Math.sqrt(varSum / lookback);
+      const thr = mean * baseMul + std * 0.6;
+      const next = energies[i + 1] ?? 0;
+      if (
+        energies[i] > thr &&
+        energies[i] > energies[i - 1] &&
+        energies[i] >= next &&
+        energies[i] > 0.008
+      ) {
+        const t = (i * hop) / sr;
+        if (beats.length === 0 || t - beats[beats.length - 1] > minGap) {
+          beats.push(t);
+        }
+      }
+    }
+    return beats;
+  }
+
+  function estimateBpm(beats) {
+    if (beats.length < 4) return null;
+    const ivals = [];
+    for (let i = 1; i < beats.length; i++) ivals.push(beats[i] - beats[i - 1]);
+    ivals.sort((x, y) => x - y);
+    const med = ivals[Math.floor(ivals.length / 2)];
+    if (med <= 0) return null;
+    let bpm = 60 / med;
+    while (bpm < 70)  bpm *= 2;
+    while (bpm > 180) bpm /= 2;
+    return Math.round(bpm);
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  Pattern üretici
+  // ─────────────────────────────────────────────────────────────
+  function generateShow() {
+    if (!state.audioBuffer) { toast('Önce şarkı yükle.', 'error'); return; }
+    const sens = +$('#sensitivity').value;
+    const pulse = Math.max(1, +$('#pulseLen').value || 2);
+    const style = $('#patternStyle').value;
+    const includeClosures = $('#includeClosures').checked;
+    const autoSignals = $('#autoSignals').checked;
+
+    state.beats = detectBeats(state.audioBuffer, sens);
+    state.bpm = estimateBpm(state.beats);
+    $('#bpmDisplay').textContent = `BPM: ${state.bpm ?? '--'}`;
+    $('#beatsDisplay').textContent = `beats: ${state.beats.length}`;
+
+    clearFrames();
+
+    const outline    = [0, 1, 2, 3, 4, 5];
+    const headlights = [6, 7, 8, 9];
+    const tails      = [12, 13];
+    const signals    = [16, 17, 18, 19];
+    const closures   = [20, 21, 22, 23, 24, 25, 26, 27, 28, 29];
+
+    const setRange = (chs, frameIdx) => {
+      for (let p = 0; p < pulse; p++) {
+        const f = frameIdx + p;
+        if (f < 0 || f >= state.frameCount) continue;
+        const row = state.frames[f];
+        for (const c of chs) row[c] = 1;
+      }
+    };
+
+    state.beats.forEach((t, i) => {
+      const f = Math.floor(t * 1000 / STEP_MS);
+      let chs = [];
+      switch (style) {
+        case 'strobe': {
+          chs = [...outline, ...headlights];
+          if (i % 2 === 0) chs.push(...tails);
+          break;
+        }
+        case 'chase': {
+          const order = [0, 1, 3, 5, 4, 2];      // saat yönünde outline
+          chs = [order[i % order.length]];
+          if (i % 4 === 0) chs.push(10);          // long beam
+          break;
+        }
+        case 'wave': {
+          const stage = i % 3;
+          if (stage === 0) chs = [...headlights, 10];
+          else if (stage === 1) chs = [2, 3, 18, 19];
+          else chs = [...tails, 4, 5, 14];
+          break;
+        }
+        case 'random': {
+          const pool = includeClosures
+            ? [...outline, ...headlights, ...tails, ...closures]
+            : [...outline, ...headlights, ...tails];
+          const k = 2 + Math.floor(Math.random() * 4);
+          chs = [];
+          while (chs.length < k) {
+            const c = pool[Math.floor(Math.random() * pool.length)];
+            if (!chs.includes(c)) chs.push(c);
+          }
+          break;
+        }
+        case 'beatdrop': {
+          if (i % 4 === 0) {
+            chs = [...outline, ...headlights, 10, ...tails, ...signals];
+          } else {
+            chs = i % 2 === 0 ? [0, 1, 6, 8] : [4, 5, 12, 13];
+          }
+          break;
+        }
+        case 'symmetric': {
+          const pairs = [
+            [0, 1], [6, 8], [7, 9], [2, 3], [4, 5], [12, 13], [16, 17],
+          ];
+          chs = pairs[i % pairs.length];
+          if (i % 8 === 0) chs = [...chs, 10];
+          break;
+        }
+      }
+      if (autoSignals && i % 6 === 0) chs.push(16, 17);
+      if (includeClosures && i % 8 === 0) chs.push(closures[i % closures.length]);
+      setRange(chs, f);
+    });
+
+    drawGrid();
+    drawWaveform();
+    syncSvg(getCurrentFrame());
+    toast(`${state.beats.length} beat algılandı · ${state.bpm ?? '--'} BPM`, 'ok');
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  Çizim — waveform, ruler, grid
+  // ─────────────────────────────────────────────────────────────
+  function setupCanvasHiDPI(canvas, w, h) {
+    const dpr = window.devicePixelRatio || 1;
+    const W = Math.max(1, Math.floor(w));
+    const H = Math.max(1, Math.floor(h));
+    canvas.width = Math.floor(W * dpr);
+    canvas.height = Math.floor(H * dpr);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return ctx;
+  }
+
+  function drawWaveform() {
+    const canvas = $('#waveformCanvas');
+    const totalW = state.frameCount * state.pxPerFrame;
+    const h = 56;
+    const wrap = canvas.parentElement;
+    wrap.style.width = (totalW + 14) + 'px';   // not used (parent handles), but keeps layout
+    const ctx = setupCanvasHiDPI(canvas, totalW, h);
+    ctx.clearRect(0, 0, totalW, h);
+
+    if (state.audioBuffer) {
+      const data = state.audioBuffer.getChannelData(0);
+      const N = data.length;
+      const step = Math.max(1, Math.floor(N / totalW));
+      ctx.fillStyle = '#3a4658';
+      ctx.beginPath();
+      for (let x = 0; x < totalW; x++) {
+        let min = 1, max = -1;
+        const start = x * step;
+        for (let i = 0; i < step; i++) {
+          const v = data[start + i] || 0;
+          if (v < min) min = v;
+          if (v > max) max = v;
+        }
+        const y1 = ((1 - max) * 0.5) * h;
+        const y2 = ((1 - min) * 0.5) * h;
+        ctx.fillRect(x, y1, 1, Math.max(1, y2 - y1));
+      }
+    }
+    // beats
+    ctx.fillStyle = 'rgba(227,25,55,0.55)';
+    for (const t of state.beats) {
+      const x = (t * 1000 / STEP_MS) * state.pxPerFrame;
+      ctx.fillRect(x, 0, 1.5, h);
+    }
+  }
+
+  function drawRuler() {
+    const canvas = $('#rulerCanvas');
+    const totalW = state.frameCount * state.pxPerFrame;
+    const h = 22;
+    const ctx = setupCanvasHiDPI(canvas, totalW, h);
+    ctx.clearRect(0, 0, totalW, h);
+    ctx.fillStyle = '#0d1117';
+    ctx.fillRect(0, 0, totalW, h);
+    ctx.font = '10px ui-monospace, Menlo, monospace';
+    ctx.fillStyle = '#8b97a8';
+    const tickEverySec = state.pxPerFrame >= 6 ? 1 : (state.pxPerFrame >= 3 ? 2 : 5);
+    for (let s = 0; s <= state.duration + 0.001; s += tickEverySec) {
+      const x = (s * 1000 / STEP_MS) * state.pxPerFrame;
+      ctx.fillRect(x, h - 6, 1, 6);
+      ctx.fillText(`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`, x + 3, 12);
+    }
+  }
+
+  function drawGrid() {
+    const labelsEl = $('#channelLabels');
+    if (!labelsEl.children.length) {
+      const frag = document.createDocumentFragment();
+      CHANNELS.forEach((c) => {
+        const row = document.createElement('div');
+        row.className = `row group-${c.group}`;
+        row.textContent = c.name;
+        frag.appendChild(row);
+      });
+      labelsEl.appendChild(frag);
+    }
+    const canvas = $('#gridCanvas');
+    const totalW = state.frameCount * state.pxPerFrame;
+    const totalH = MAX_CH * state.rowHeight;
+    const ctx = setupCanvasHiDPI(canvas, totalW, totalH);
+    ctx.clearRect(0, 0, totalW, totalH);
+
+    // arka plan + satır çizgileri
+    for (let r = 0; r < MAX_CH; r++) {
+      ctx.fillStyle = r % 2 === 0 ? '#0e1420' : '#10172278';
+      ctx.fillRect(0, r * state.rowHeight, totalW, state.rowHeight);
+    }
+    // dikey grid (her saniye + her beat 4 frame)
+    ctx.fillStyle = '#1a2231';
+    const secEvery = Math.round(1000 / STEP_MS); // 20 frame = 1s
+    for (let f = 0; f < state.frameCount; f++) {
+      const x = f * state.pxPerFrame;
+      if (f % secEvery === 0) {
+        ctx.fillStyle = '#22304a';
+        ctx.fillRect(x, 0, 1, totalH);
+        ctx.fillStyle = '#1a2231';
+      } else if (f % 4 === 0 && state.pxPerFrame >= 6) {
+        ctx.fillRect(x, 0, 1, totalH);
+      }
+    }
+    // beat dikey çizgiler
+    ctx.fillStyle = 'rgba(227,25,55,0.18)';
+    for (const t of state.beats) {
+      const x = (t * 1000 / STEP_MS) * state.pxPerFrame;
+      ctx.fillRect(x, 0, 1, totalH);
+    }
+    // hücreler
+    for (let f = 0; f < state.frameCount; f++) {
+      const row = state.frames[f];
+      if (!row) continue;
+      const x = f * state.pxPerFrame;
+      for (let c = 0; c < MAX_CH; c++) {
+        if (!row[c]) continue;
+        const y = c * state.rowHeight + 2;
+        ctx.fillStyle = colorForGroup(CHANNELS[c].group);
+        ctx.fillRect(x, y, Math.max(1, state.pxPerFrame - 1), state.rowHeight - 4);
+      }
+    }
+    $('#zoomLabel').textContent = `${state.pxPerFrame} px / frame`;
+  }
+
+  function colorForGroup(g) {
+    return {
+      outline:   '#57f5ff',
+      headlight: '#ffe27a',
+      tail:      '#ff3a4a',
+      signal:    '#ffb454',
+      closure:   '#c084fc',
+    }[g] || '#e6edf3';
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  Grid etkileşim (tıkla / sürükle)
+  // ─────────────────────────────────────────────────────────────
+  function setupGridInteraction() {
+    const canvas = $('#gridCanvas');
+    let painting = null;        // 'add' | 'erase' | null
+    let lastCell = null;
+
+    const cellFromEvent = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const f = Math.floor(x / state.pxPerFrame);
+      const c = Math.floor(y / state.rowHeight);
+      if (f < 0 || f >= state.frameCount || c < 0 || c >= MAX_CH) return null;
+      return { f, c };
+    };
+
+    canvas.addEventListener('mousedown', (e) => {
+      const cell = cellFromEvent(e);
+      if (!cell) return;
+      const cur = state.frames[cell.f][cell.c];
+      painting = e.shiftKey ? 'erase' : (cur ? 'erase' : 'add');
+      applyPaint(cell);
+      lastCell = cell;
+      e.preventDefault();
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!painting) return;
+      const cell = cellFromEvent(e);
+      if (!cell || (lastCell && cell.f === lastCell.f && cell.c === lastCell.c)) return;
+      applyPaint(cell);
+      lastCell = cell;
+    });
+    window.addEventListener('mouseup', () => { painting = null; lastCell = null; });
+
+    function applyPaint({ f, c }) {
+      state.frames[f][c] = painting === 'add' ? 1 : 0;
+      // satır + sütun bölgesini hızlı yeniden çiz (tek hücre)
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const x = f * state.pxPerFrame;
+      const y = c * state.rowHeight;
+      ctx.fillStyle = c % 2 === 0 ? '#0e1420' : '#101722';
+      ctx.fillRect(x, y, state.pxPerFrame, state.rowHeight);
+      // beat çizgisi varsa korumak için tüm satırı tam yeniden çizmek yerine kenarları ekle
+      if (state.frames[f][c]) {
+        ctx.fillStyle = colorForGroup(CHANNELS[c].group);
+        ctx.fillRect(x, y + 2, Math.max(1, state.pxPerFrame - 1), state.rowHeight - 4);
+      }
+      syncSvg(getCurrentFrame());
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  Playback
+  // ─────────────────────────────────────────────────────────────
+  function play() {
+    if (!state.audioBuffer) { toast('Önce şarkı yükle.', 'error'); return; }
+    if (state.isPlaying) return;
+    if (state.audioCtx.state === 'suspended') state.audioCtx.resume();
+    const src = state.audioCtx.createBufferSource();
+    src.buffer = state.audioBuffer;
+    src.connect(state.audioCtx.destination);
+    src.start(0, state.startOffset);
+    state.sourceNode = src;
+    state.startedAt = state.audioCtx.currentTime - state.startOffset;
+    state.isPlaying = true;
+    $('#playBtn').textContent = '❚❚';
+    src.onended = () => {
+      if (state.isPlaying) stop(true);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  function pause() {
+    if (!state.isPlaying) return;
+    state.startOffset = state.audioCtx.currentTime - state.startedAt;
+    if (state.sourceNode) state.sourceNode.stop();
+    state.isPlaying = false;
+    $('#playBtn').textContent = '▶';
+  }
+
+  function stop(natural = false) {
+    if (state.sourceNode) {
+      try { state.sourceNode.onended = null; state.sourceNode.stop(); } catch (e) {}
+    }
+    state.isPlaying = false;
+    state.startOffset = natural ? state.duration : 0;
+    if (natural) state.startOffset = 0;
+    $('#playBtn').textContent = '▶';
+    updateTime();
+    updatePlayhead();
+    syncSvg(getCurrentFrame());
+  }
+
+  function getCurrentFrame() {
+    let t = state.startOffset;
+    if (state.isPlaying) t = state.audioCtx.currentTime - state.startedAt;
+    t = Math.max(0, Math.min(state.duration, t));
+    return Math.floor(t * 1000 / STEP_MS);
+  }
+
+  function tick() {
+    if (!state.isPlaying) return;
+    updateTime();
+    updatePlayhead();
+    syncSvg(getCurrentFrame());
+    if (state.audioCtx.currentTime - state.startedAt >= state.duration) {
+      stop(true);
       return;
     }
-    empty.hidden = true;
+    requestAnimationFrame(tick);
+  }
 
-    const tpl = $('#archive-card-tpl');
-    items.forEach(it => {
-      const node = tpl.content.firstElementChild.cloneNode(true);
-      node.querySelector('.a-title').textContent = it.topic;
-      node.querySelector('.a-date').textContent  = fmtDate(it.updatedAt || it.createdAt);
-      node.querySelector('.a-content').textContent = it.content;
-      node.querySelector('.a-tags').textContent = it.tags || '';
+  function updateTime() {
+    const t = state.isPlaying ? (state.audioCtx.currentTime - state.startedAt) : state.startOffset;
+    $('#timeDisplay').textContent = `${fmtTime(t)} / ${fmtTime(state.duration)}`;
+    $('#seek').value = state.duration ? Math.round((t / state.duration) * 1000) : 0;
+    updateFrameDisplay();
+  }
+  function updateFrameDisplay() {
+    $('#frameDisplay').textContent = `frame ${getCurrentFrame()} / ${state.frameCount}`;
+  }
+  function updatePlayhead() {
+    const f = getCurrentFrame();
+    const x = f * state.pxPerFrame;
+    const ph = $('#playhead');
+    ph.style.transform = `translateX(${140 + x}px)`;
+    // otomatik scroll
+    const scroller = $('#gridScroll');
+    const left = scroller.scrollLeft;
+    const view = scroller.clientWidth;
+    if (x + 140 < left || x + 140 > left + view - 60) {
+      scroller.scrollLeft = Math.max(0, x - view * 0.3);
+    }
+  }
 
-      node.querySelector('.a-copy-tc').addEventListener('click', async () => {
-        try { await copyText(buildTopicContent(it)); toast('📝 Konu + İçerik kopyalandı'); }
-        catch { toast('Kopyalanamadı'); }
-      });
-      node.querySelector('.a-copy-reels').addEventListener('click', async () => {
-        try { await copyText(buildReelsCaption(it)); toast('🎬 Reels kopyalandı'); }
-        catch { toast('Kopyalanamadı'); }
-      });
-      node.querySelector('.a-copy').addEventListener('click', async () => {
-        try { await copyText(buildOutput(it)); toast('📋 Tümü kopyalandı'); }
-        catch { toast('Kopyalanamadı'); }
-      });
-      node.querySelector('.a-edit').addEventListener('click', () => editor.editFrom(it));
-      node.querySelector('.a-del').addEventListener('click', () => {
-        if (!confirm(`"${it.topic}" silinsin mi?`)) return;
-        db.remove(it.id);
-        toast('🗑️ Silindi');
-        this.refresh();
-      });
-      list.appendChild(node);
+  // ─────────────────────────────────────────────────────────────
+  //  SVG senkron (seçili frame'i ışıkları yansıt)
+  // ─────────────────────────────────────────────────────────────
+  function syncSvg(frameIdx) {
+    const row = state.frames[frameIdx] || new Uint8Array(MAX_CH);
+    $$('#teslaSvg .light').forEach((el) => {
+      const ch = +el.getAttribute('data-ch');
+      el.classList.toggle('on', !!row[ch]);
     });
-  },
+  }
 
-  exportAll() {
-    const items = db.list();
-    if (items.length === 0) { toast('Arşiv boş'); return; }
-    const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
+  // ─────────────────────────────────────────────────────────────
+  //  .fseq v2.0 (uncompressed, Tesla uyumlu) export
+  // ─────────────────────────────────────────────────────────────
+  function buildFseq() {
+    const channelCount = MAX_CH;
+    const frameCount = state.frameCount;
+    const headerLen = 32;
+    const dataOffset = headerLen;
+    const totalSize = dataOffset + frameCount * channelCount;
+
+    const buf = new ArrayBuffer(totalSize);
+    const view = new DataView(buf);
+    // 'PSEQ'
+    view.setUint8(0, 0x50); view.setUint8(1, 0x53);
+    view.setUint8(2, 0x45); view.setUint8(3, 0x51);
+    view.setUint16(4, dataOffset, true);     // channel data offset
+    view.setUint8(6, 0);                     // minor version
+    view.setUint8(7, 2);                     // major version
+    view.setUint16(8, headerLen, true);      // header length
+    view.setUint32(10, channelCount, true);  // channel count
+    view.setUint32(14, frameCount, true);    // frame count
+    view.setUint8(18, STEP_MS);              // step time ms
+    view.setUint8(19, 0);                    // flags
+    view.setUint8(20, 0);                    // compression type: none
+    view.setUint8(21, 0);                    // num compression blocks
+    view.setUint8(22, 0);                    // num sparse ranges
+    view.setUint8(23, 0);                    // flags2
+    // 24..31: unique id (8 bytes) — timestamp ms
+    const id = BigInt(Date.now());
+    view.setBigUint64(24, id, true);
+
+    const u8 = new Uint8Array(buf, dataOffset);
+    for (let f = 0; f < frameCount; f++) {
+      const row = state.frames[f];
+      const off = f * channelCount;
+      for (let c = 0; c < channelCount; c++) {
+        u8[off + c] = row && row[c] ? 255 : 0;
+      }
+    }
+    return buf;
+  }
+
+  function downloadBlob(buf, name, type = 'application/octet-stream') {
+    const blob = new Blob([buf], { type });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    const stamp = new Date().toISOString().slice(0,10);
-    a.download = `yalin-anlatir-arsiv-${stamp}.json`;
+    a.href = url; a.download = name;
     document.body.appendChild(a);
     a.click();
     a.remove();
-    URL.revokeObjectURL(url);
-    toast('⤓ Dışa aktarıldı');
-  },
-
-  importFile(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const data = JSON.parse(reader.result);
-        if (!Array.isArray(data)) throw new Error('bad');
-        const existing = db.list();
-        const byId = new Map(existing.map(x => [x.id, x]));
-        let added = 0;
-        data.forEach(it => {
-          if (!it.topic || !it.content) return;
-          const id = it.id || newId();
-          if (!byId.has(id)) {
-            existing.push({
-              id,
-              topic: String(it.topic),
-              content: String(it.content),
-              reels: String(it.reels || ''),
-              tags: String(it.tags || ''),
-              createdAt: it.createdAt || Date.now(),
-              updatedAt: it.updatedAt || Date.now(),
-            });
-            added++;
-          }
-        });
-        existing.sort((a,b) => (b.updatedAt||0) - (a.updatedAt||0));
-        db.save(existing);
-        this.refresh();
-        toast(`⤒ ${added} kayıt içe aktarıldı`);
-      } catch {
-        toast('Geçersiz dosya');
-      } finally {
-        e.target.value = '';
-      }
-    };
-    reader.readAsText(file);
-  },
-};
-
-/* ---------------- Settings ---------------- */
-const settings = {
-  defaults: { apiKey: '', model: 'claude-opus-4-7' },
-
-  load() {
-    try {
-      const d = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
-      return { ...this.defaults, ...d };
-    } catch { return { ...this.defaults }; }
-  },
-
-  saveValues(v) { localStorage.setItem(SETTINGS_KEY, JSON.stringify(v)); },
-
-  modal: null,
-
-  init() {
-    this.modal = $('#modal-settings');
-    $('#btn-settings').addEventListener('click', () => this.open());
-    this.modal.addEventListener('click', (e) => {
-      if (e.target.matches('[data-close]')) this.close();
-    });
-    document.addEventListener('keydown', (e) => {
-      if (!this.modal.hidden && e.key === 'Escape') this.close();
-    });
-    $('#s-save').addEventListener('click', () => {
-      const v = {
-        apiKey: $('#s-api-key').value.trim(),
-        model:  $('#s-model').value,
-      };
-      this.saveValues(v);
-      this.close();
-      toast(v.apiKey ? '⚙️ Ayarlar kaydedildi' : '⚙️ Anahtar boş — üret kullanılmaz');
-    });
-  },
-
-  open() {
-    const s = this.load();
-    $('#s-api-key').value = s.apiKey;
-    $('#s-model').value   = s.model;
-    this.modal.hidden = false;
-    this.modal.setAttribute('aria-hidden', 'false');
-    setTimeout(() => $('#s-api-key').focus(), 30);
-  },
-
-  close() {
-    this.modal.hidden = true;
-    this.modal.setAttribute('aria-hidden', 'true');
-  },
-};
-
-/* ---------------- AI (Claude API) ---------------- */
-const AI_SYSTEM_PROMPT = `Sen "Av. Yalın Anlatır" karakteri için TikTok / Instagram Reels / YouTube Shorts video metinleri hazırlayan uzman bir Türk hukuk içerik editörüsün.
-
-KARAKTER SESİ:
-- Sade, net Türkçe. Hukuki terim kullanınca hemen yanında günlük karşılığını ver.
-- Tarafsız, didaktik, güven veren. Yasal tavsiye değil; bilgilendirme.
-- Kısa cümleler. 20-30 saniyelik okuma (yaklaşık 55-80 kelime).
-
-GÖREV: Kullanıcı sana bir konu başlığı verecek. Tam olarak "build_script" aracını çağırarak üç alan döndür. Başka metin üretme.
-
-ALAN 1 — content (İçerik paragrafı):
-- 3-5 kısa cümle, 55-80 kelime arası.
-- 1. cümle: kavramın özü / birinci kavramın tanımı.
-- 2. cümle: ikinci kavram veya karşıt durum.
-- 3. cümle: usul / şart / hukuka uygunluk vurgusu (yetki, sebep, delil, süre, karar mercii vb.).
-- Son cümle MUTLAKA "Kısacası:" ile başlasın ve tek cümlelik net, akılda kalıcı özet olsun.
-- "Her somut olay farklıdır", "profesyonel destek alın" gibi uyarıları SIKIŞTIRMA.
-
-ALAN 2 — reels (TikTok-Reels açıklaması, emojili):
-- İlk satır: çarpıcı soru veya slogan, başında tema emojisi (⚖️ 🚓 📜 🔒 👮 🧑‍⚖️ 📝 💼 🏛️ vb.).
-- Sonra boş satır.
-- 3-4 satır: her biri EMOJİ + 2-5 kelimelik kilit ifade. Maddeleme işareti (-, *) KULLANMA.
-- Sonra boş satır.
-- Son satır: mesajın özeti, tercihen ⚖️ ile.
-- Satırları gerçek satır sonu (\\n) ile ayır.
-
-ALAN 3 — tags (Hashtag satırı):
-- Boşlukla ayrılmış 5-7 hashtag.
-- #hukuk #yalınanlatır #avukat MUTLAKA yer alsın.
-- Konuya özgü en az 1-2 hashtag ekle: #arama, #cezahukuku, #tutuklama, #borçlar, #ailehukuku, #iskazasi, #kvkk, #işhukuku, #kira, #miras vb.
-
-HUKUKİ DOĞRULUK:
-- Türkiye Cumhuriyeti mevzuatına göre yaz (CMK, TCK, TMK, TBK, İK vb.).
-- Emin olmadığın madde numarası, süre veya ceza miktarı UYDURMA. Genel hukuki ilkeyle yetin.
-- Tavsiye yönlendirmesi yapma; bilgilendirme tonunda kal.
-
-Her çıktı aynı yapısal tutarlılıkta olsun. Sadece aracı çağır, önsöz veya açıklama ekleme.`;
-
-const IDEAS_SYSTEM_PROMPT = `Sen "Av. Yalın Anlatır" karakteri için TikTok / Reels / Shorts video konu başlıkları öneren Türk hukuk editörüsün.
-
-GÖREV: Kullanıcı bir hukuk alanı verecek. O alanda "suggest_topics" aracını çağırarak 6-8 çarpıcı konu başlığı döndür.
-
-BAŞLIK KURALLARI:
-- Her başlık 4-10 kelime arası, sade Türkçe.
-- Günlük yaşamda merak edilen, geniş kitleyi ilgilendiren konular seç.
-- Tercihen iki kavramı karşılaştır ("X ile Y arasındaki fark") veya net soru sor ("X ne demek?", "X nasıl ispatlanır?").
-- Her başlık farklı bir noktayı işlesin; tekrar etme.
-- "Hukukta", "Türk hukukunda" gibi gereksiz önek kullanma.
-- Karışık alan seçildiyse farklı dallardan (aile, ceza, iş, tazminat, kira, miras, tüketici) dengeli dağılım yap.
-
-HUKUKİ DOĞRULUK:
-- Türkiye Cumhuriyeti mevzuatına uygun olsun (CMK, TCK, TMK, TBK, İK vb.).
-- Uydurma kurum, süreç veya kavram YAZMA.
-
-Sadece aracı çağır, başka metin üretme.`;
-
-const ai = {
-  async _call({ system, tool, userMessage, s }) {
-    const body = {
-      model: s.model || 'claude-opus-4-7',
-      max_tokens: 1024,
-      system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
-      tools: [tool],
-      tool_choice: { type: 'tool', name: tool.name },
-      messages: [{ role: 'user', content: userMessage }],
-    };
-
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': s.apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-      let detail = '';
-      try {
-        const err = await res.json();
-        detail = err?.error?.message || JSON.stringify(err);
-      } catch {
-        detail = await res.text().catch(() => '');
-      }
-      throw new Error(`${res.status} ${(detail || '').slice(0, 160)}`);
-    }
-
-    const data = await res.json();
-    const block = (data.content || []).find(b => b.type === 'tool_use' && b.name === tool.name);
-    if (!block || !block.input) throw new Error('Beklenen araç çağrısı dönmedi');
-    return block.input;
-  },
-
-  generate(topic, s) {
-    return this._call({
-      system: AI_SYSTEM_PROMPT,
-      tool: {
-        name: 'build_script',
-        description: 'Av. Yalın Anlatır video metninin üç parçasını döndür.',
-        input_schema: {
-          type: 'object',
-          properties: {
-            content: {
-              type: 'string',
-              description: 'İçerik paragrafı: 3-5 kısa cümle, ~55-80 kelime, son cümle "Kısacası:" ile başlar.',
-            },
-            reels: {
-              type: 'string',
-              description: 'TikTok/Reels emoji açıklaması. Çarpıcı emojili başlık satırı + boş satır + 3-4 emojili kilit satır + boş satır + emojili kapanış. Satırlar \\n ile.',
-            },
-            tags: {
-              type: 'string',
-              description: 'Boşlukla ayrılmış 5-7 hashtag. #hukuk #yalınanlatır #avukat mutlaka yer alsın.',
-            },
-          },
-          required: ['content', 'reels', 'tags'],
-        },
-      },
-      userMessage: `Konu: ${topic}\n\nBu konu için tam şablonda bir video metni üret.`,
-      s,
-    });
-  },
-
-  async suggestTopics(areaLabel, s) {
-    const r = await this._call({
-      system: IDEAS_SYSTEM_PROMPT,
-      tool: {
-        name: 'suggest_topics',
-        description: 'Verilen hukuk alanı için video konu başlıklarını döndür.',
-        input_schema: {
-          type: 'object',
-          properties: {
-            topics: {
-              type: 'array',
-              items: { type: 'string' },
-              minItems: 6,
-              maxItems: 8,
-              description: '6-8 adet çarpıcı, kısa konu başlığı.',
-            },
-          },
-          required: ['topics'],
-        },
-      },
-      userMessage: `Alan: ${areaLabel}\n\nBu alan için 6-8 çarpıcı, merak uyandıran video konu başlığı öner. Daha önce çok işlenmemiş ama geniş kitleyi ilgilendiren başlıklar seç.`,
-      s,
-    });
-    return Array.isArray(r.topics) ? r.topics : [];
-  },
-};
-
-/* ---------------- Ideas (topic suggestions) ---------------- */
-const AREA_LABELS = {
-  karisik:  'Karışık — hukukun farklı alanlarından dengeli seçim',
-  aile:     'Aile Hukuku',
-  ceza:     'Ceza Hukuku',
-  is:       'İş Hukuku',
-  tazminat: 'Tazminat Hukuku',
-  kira:     'Kira ve Gayrimenkul Hukuku',
-  tuketici: 'Tüketici Hukuku',
-  miras:    'Miras Hukuku',
-  kvkk:     'KVKK ve Dijital Hukuk',
-  borclar:  'Borçlar Hukuku ve Sözleşmeler',
-};
-
-const ideas = {
-  modal: null,
-  pool: [], // {topic, checked}
-
-  init() {
-    this.modal = $('#modal-ideas');
-    $('#btn-ideas').addEventListener('click', () => this.open());
-    $('#i-gen').addEventListener('click', () => this.suggest(false));
-    $('#i-add-more').addEventListener('click', () => this.suggest(true));
-    $('#i-build').addEventListener('click', () => this.buildSelected());
-
-    $('#i-select-all').addEventListener('change', (e) => {
-      const on = e.target.checked;
-      this.pool.forEach(p => p.checked = on);
-      this.renderList();
-    });
-
-    this.modal.addEventListener('click', (e) => {
-      if (e.target.matches('[data-close]')) { this.close(); return; }
-      const pickBtn = e.target.closest('.idea-pick');
-      if (pickBtn) {
-        e.preventDefault();
-        this.pickToEditor(pickBtn.dataset.topic);
-        return;
-      }
-      const item = e.target.closest('.idea-item');
-      if (item && !e.target.matches('input[type="checkbox"]')) {
-        const cb = item.querySelector('input[type="checkbox"]');
-        if (cb) {
-          cb.checked = !cb.checked;
-          this.onToggle(cb);
-        }
-      }
-    });
-
-    this.modal.addEventListener('change', (e) => {
-      if (e.target.matches('.idea-check')) this.onToggle(e.target);
-    });
-
-    document.addEventListener('keydown', (e) => {
-      if (!this.modal.hidden && e.key === 'Escape') this.close();
-    });
-  },
-
-  open() {
-    this.modal.hidden = false;
-    this.modal.setAttribute('aria-hidden', 'false');
-    setTimeout(() => $('#i-area').focus(), 30);
-  },
-
-  close() {
-    this.modal.hidden = true;
-    this.modal.setAttribute('aria-hidden', 'true');
-  },
-
-  pickToEditor(topic) {
-    if (!topic) return;
-    editor.editingId = null;
-    editor.els.topic.value = topic;
-    editor.render();
-    editor.saveDraft();
-    this.close();
-    tabs.show('editor');
-    editor.els.topic.focus();
-    toast('💡 Başlık editöre yapıştı — ⚡ Üret\'e bas');
-  },
-
-  onToggle(cb) {
-    const topic = cb.dataset.topic;
-    const item = this.pool.find(p => p.topic === topic);
-    if (item) item.checked = cb.checked;
-    cb.closest('.idea-item')?.classList.toggle('is-checked', cb.checked);
-    this.updateFooter();
-  },
-
-  updateFooter() {
-    const sel = this.pool.filter(p => p.checked).length;
-    const total = this.pool.length;
-    $('#i-count').textContent = `${sel} seçili / ${total}`;
-    $('#i-build').disabled = sel === 0;
-    const all = $('#i-select-all');
-    all.checked = total > 0 && sel === total;
-    all.indeterminate = sel > 0 && sel < total;
-    $('#ideas-foot').hidden = total === 0;
-  },
-
-  renderList() {
-    const list = $('#ideas-list');
-    const empty = $('#ideas-empty');
-    list.innerHTML = '';
-    if (!this.pool.length) {
-      empty.classList.remove('is-hidden');
-      empty.textContent = 'Henüz öneri yok. ⚡ Başlık Öner\'e bas.';
-      this.updateFooter();
-      return;
-    }
-    empty.classList.add('is-hidden');
-    this.pool.forEach(p => {
-      const row = document.createElement('label');
-      row.className = 'idea-item' + (p.checked ? ' is-checked' : '');
-      row.innerHTML = `
-        <input type="checkbox" class="idea-check" data-topic="${escAttr(p.topic)}" ${p.checked ? 'checked' : ''} />
-        <span class="idea-text"></span>
-        <button type="button" class="idea-pick" data-topic="${escAttr(p.topic)}" title="Sadece bunu editöre at">→ Editör</button>
-      `;
-      row.querySelector('.idea-text').textContent = p.topic;
-      list.appendChild(row);
-    });
-    this.updateFooter();
-  },
-
-  async suggest(append) {
-    const s = settings.load();
-    if (!s.apiKey) {
-      toast('Önce ⚙️ Ayarlar\'dan API anahtarı gir');
-      this.close();
-      settings.open();
-      return;
-    }
-    const area = $('#i-area').value;
-    const label = AREA_LABELS[area] || area;
-    const btn = append ? $('#i-add-more') : $('#i-gen');
-    const origLabel = btn.textContent;
-    btn.disabled = true;
-    btn.classList.add('is-loading');
-    btn.textContent = '⏳ Öneriliyor';
-    try {
-      const topics = await ai.suggestTopics(label, s);
-      const newOnes = topics
-        .map(t => t.trim())
-        .filter(t => t && !this.pool.some(p => p.topic === t));
-      if (!append) this.pool = [];
-      newOnes.forEach(t => this.pool.push({ topic: t, checked: false }));
-      this.renderList();
-      if (!newOnes.length) toast('Yeni başlık üretilemedi');
-    } catch (e) {
-      console.error(e);
-      toast('Öneri başarısız: ' + (e.message || 'hata'));
-    } finally {
-      btn.disabled = false;
-      btn.classList.remove('is-loading');
-      btn.textContent = origLabel;
-    }
-  },
-
-  async buildSelected() {
-    const s = settings.load();
-    if (!s.apiKey) {
-      toast('Önce ⚙️ Ayarlar\'dan API anahtarı gir');
-      this.close();
-      settings.open();
-      return;
-    }
-    const selected = this.pool.filter(p => p.checked).map(p => p.topic);
-    if (!selected.length) { toast('En az 1 başlık seç'); return; }
-
-    const btn = $('#i-build');
-    const origLabel = btn.textContent;
-    btn.disabled = true;
-    btn.classList.add('is-loading');
-
-    let ok = 0, fail = 0;
-    for (let i = 0; i < selected.length; i++) {
-      btn.textContent = `⏳ ${i + 1}/${selected.length} üretiliyor`;
-      try {
-        const out = await ai.generate(selected[i], s);
-        results.add({
-          id: newId(),
-          topic: selected[i],
-          content: out.content || '',
-          reels:   out.reels   || '',
-          tags:    out.tags    || '',
-          createdAt: Date.now(),
-        });
-        ok++;
-      } catch (e) {
-        console.error('build failed:', selected[i], e);
-        fail++;
-      }
-    }
-
-    btn.disabled = false;
-    btn.classList.remove('is-loading');
-    btn.textContent = origLabel;
-
-    // Üretilenleri havuzdan çıkar (kullanıcı tekrar seçmesin)
-    this.pool = this.pool.filter(p => !p.checked);
-    this.renderList();
-    this.close();
-
-    tabs.show('results');
-    if (fail === 0) toast(`✨ ${ok} sonuç üretildi`);
-    else toast(`✨ ${ok} başarılı · ${fail} hata`);
-  },
-};
-
-/* ---------------- Results (toplu üretim çıktıları) ---------------- */
-function escAttr(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-}
-
-const results = {
-  list() {
-    try { return JSON.parse(localStorage.getItem(RESULTS_KEY) || '[]'); }
-    catch { return []; }
-  },
-  saveAll(items) { localStorage.setItem(RESULTS_KEY, JSON.stringify(items)); },
-  add(item) {
-    const items = this.list();
-    items.unshift(item);
-    this.saveAll(items);
-    this.refresh();
-  },
-  remove(id) {
-    this.saveAll(this.list().filter(x => x.id !== id));
-    this.refresh();
-  },
-  clearAll() {
-    this.saveAll([]);
-    this.refresh();
-  },
-
-  init() {
-    $('#btn-results-clear').addEventListener('click', () => {
-      if (!this.list().length) { toast('Liste zaten boş'); return; }
-      if (!confirm('Tüm üretilen sonuçlar silinsin mi?')) return;
-      this.clearAll();
-      toast('🧹 Sonuçlar temizlendi');
-    });
-    $('#btn-results-archive-all').addEventListener('click', () => this.archiveAll());
-    this.refresh();
-  },
-
-  refresh() {
-    const items = this.list();
-    $('#resultsCount').textContent = items.length;
-
-    const list = $('#results-list');
-    const empty = $('#results-empty');
-    list.innerHTML = '';
-
-    if (!items.length) {
-      empty.hidden = false;
-      return;
-    }
-    empty.hidden = true;
-
-    const tpl = $('#result-card-tpl');
-    items.forEach(it => {
-      const node = tpl.content.firstElementChild.cloneNode(true);
-      node.querySelector('.r-title').textContent = it.topic;
-      node.querySelector('.r-date').textContent  = fmtDate(it.createdAt);
-      node.querySelector('.r-content').textContent = it.content;
-      node.querySelector('.r-reels').textContent = it.reels;
-      node.querySelector('.r-tags').textContent = it.tags || '';
-
-      node.querySelector('.r-copy-tc').addEventListener('click', async () => {
-        try { await copyText(buildTopicContent(it)); toast('📝 Konu + İçerik kopyalandı'); }
-        catch { toast('Kopyalanamadı'); }
-      });
-      node.querySelector('.r-copy-reels').addEventListener('click', async () => {
-        try { await copyText(buildReelsCaption(it)); toast('🎬 Reels kopyalandı'); }
-        catch { toast('Kopyalanamadı'); }
-      });
-      node.querySelector('.r-edit').addEventListener('click', () => {
-        editor.editingId = null;
-        editor.setData(it);
-        editor.saveDraft();
-        tabs.show('editor');
-      });
-      node.querySelector('.r-save').addEventListener('click', () => {
-        const now = Date.now();
-        db.add({
-          id: newId(),
-          topic: it.topic, content: it.content,
-          reels: it.reels, tags: it.tags,
-          createdAt: now, updatedAt: now,
-        });
-        archive.refresh();
-        toast('💾 Arşive eklendi');
-      });
-      node.querySelector('.r-del').addEventListener('click', () => {
-        if (!confirm('Bu sonuç silinsin mi?')) return;
-        this.remove(it.id);
-      });
-      list.appendChild(node);
-    });
-  },
-
-  archiveAll() {
-    const items = this.list();
-    if (!items.length) { toast('Liste boş'); return; }
-    const now = Date.now();
-    items.forEach(it => {
-      db.add({
-        id: newId(),
-        topic: it.topic, content: it.content,
-        reels: it.reels, tags: it.tags,
-        createdAt: now, updatedAt: now,
-      });
-    });
-    archive.refresh();
-    toast(`💾 ${items.length} sonuç arşive eklendi`);
-  },
-};
-
-/* ---------------- Tabs ---------------- */
-const tabs = {
-  init() {
-    $$('.tab').forEach(btn => {
-      btn.addEventListener('click', () => this.show(btn.dataset.tab));
-    });
-  },
-  show(name) {
-    $$('.tab').forEach(b => {
-      const active = b.dataset.tab === name;
-      b.classList.toggle('is-active', active);
-      b.setAttribute('aria-selected', active ? 'true' : 'false');
-    });
-    $$('.view').forEach(v => {
-      const active = v.id === 'view-' + name;
-      v.classList.toggle('is-active', active);
-      v.hidden = !active;
-    });
-    if (name === 'archive') archive.refresh();
-    if (name === 'results') results.refresh();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
-};
 
-/* ---------------- Boot ---------------- */
-document.addEventListener('DOMContentLoaded', () => {
-  tabs.init();
-  editor.init();
-  archive.init();
-  results.init();
-  settings.init();
-  ideas.init();
-});
+  // ─────────────────────────────────────────────────────────────
+  //  WAV export (16-bit PCM)
+  // ─────────────────────────────────────────────────────────────
+  function audioBufferToWav(buffer) {
+    const numCh = Math.min(buffer.numberOfChannels, 2);
+    const sr = buffer.sampleRate;
+    const N  = buffer.length;
+    const bps = 2;
+    const blockAlign = numCh * bps;
+    const dataSize = N * blockAlign;
+    const buf = new ArrayBuffer(44 + dataSize);
+    const v = new DataView(buf);
+    const writeStr = (off, s) => { for (let i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i)); };
+    writeStr(0, 'RIFF');
+    v.setUint32(4, 36 + dataSize, true);
+    writeStr(8, 'WAVE');
+    writeStr(12, 'fmt ');
+    v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true);          // PCM
+    v.setUint16(22, numCh, true);
+    v.setUint32(24, sr, true);
+    v.setUint32(28, sr * blockAlign, true);
+    v.setUint16(32, blockAlign, true);
+    v.setUint16(34, 16, true);
+    writeStr(36, 'data');
+    v.setUint32(40, dataSize, true);
+
+    const channels = [];
+    for (let c = 0; c < numCh; c++) channels.push(buffer.getChannelData(c));
+    let off = 44;
+    for (let i = 0; i < N; i++) {
+      for (let c = 0; c < numCh; c++) {
+        let s = Math.max(-1, Math.min(1, channels[c][i]));
+        v.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+        off += 2;
+      }
+    }
+    return buf;
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  Proje JSON
+  // ─────────────────────────────────────────────────────────────
+  function exportProject() {
+    const data = {
+      version: 1,
+      audioName: state.audioName,
+      duration: state.duration,
+      frameCount: state.frameCount,
+      bpm: state.bpm,
+      beats: state.beats,
+      // frames: array of arrays of channel-indices (sparse)
+      frames: state.frames.map((r) => {
+        const idx = [];
+        for (let c = 0; c < MAX_CH; c++) if (r[c]) idx.push(c);
+        return idx;
+      }),
+    };
+    const json = JSON.stringify(data);
+    downloadBlob(new TextEncoder().encode(json), `${state.audioName || 'show'}.tlsm.json`, 'application/json');
+    toast('Proje indirildi.', 'ok');
+  }
+
+  function importProject(text) {
+    const d = JSON.parse(text);
+    state.duration = d.duration || (d.frameCount * STEP_MS / 1000);
+    state.frameCount = d.frameCount || Math.ceil(state.duration * 1000 / STEP_MS);
+    state.frames = new Array(state.frameCount);
+    for (let f = 0; f < state.frameCount; f++) {
+      state.frames[f] = new Uint8Array(MAX_CH);
+      const idx = (d.frames && d.frames[f]) || [];
+      for (const c of idx) state.frames[f][c] = 1;
+    }
+    state.beats = d.beats || [];
+    state.bpm   = d.bpm  || null;
+    $('#bpmDisplay').textContent = `BPM: ${state.bpm ?? '--'}`;
+    $('#beatsDisplay').textContent = `beats: ${state.beats.length}`;
+    drawWaveform();
+    drawRuler();
+    drawGrid();
+    syncSvg(getCurrentFrame());
+    toast('Proje yüklendi.', 'ok');
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  Olay bağlantıları
+  // ─────────────────────────────────────────────────────────────
+  function bind() {
+    $('#loadAudioBtn').addEventListener('click', () => $('#audioFile').click());
+    $('#audioFile').addEventListener('change', async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      try { await loadAudioFile(f); }
+      catch (err) { console.error(err); toast('Ses dosyası okunamadı.', 'error'); }
+    });
+
+    $('#autoGenBtn').addEventListener('click', generateShow);
+
+    $('#clearBtn').addEventListener('click', () => {
+      if (!state.frameCount) return;
+      clearFrames(); drawGrid(); syncSvg(getCurrentFrame());
+      toast('Tüm kanallar temizlendi.');
+    });
+
+    $('#exportFseqBtn').addEventListener('click', () => {
+      if (!state.frameCount) { toast('Önce show üret.', 'error'); return; }
+      const buf = buildFseq();
+      downloadBlob(buf, `${state.audioName || 'lightshow'}.fseq`);
+      toast('lightshow.fseq indirildi.', 'ok');
+    });
+    $('#exportWavBtn').addEventListener('click', () => {
+      if (!state.audioBuffer) { toast('Önce şarkı yükle.', 'error'); return; }
+      const buf = audioBufferToWav(state.audioBuffer);
+      downloadBlob(buf, `${state.audioName || 'lightshow'}.wav`, 'audio/wav');
+      toast('lightshow.wav indirildi.', 'ok');
+    });
+
+    $('#saveProjectBtn').addEventListener('click', exportProject);
+    $('#loadProjectBtn').addEventListener('click', () => $('#projectFile').click());
+    $('#projectFile').addEventListener('change', async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      try { importProject(await f.text()); }
+      catch (err) { console.error(err); toast('Proje okunamadı.', 'error'); }
+    });
+
+    $('#playBtn').addEventListener('click', () => state.isPlaying ? pause() : play());
+    $('#stopBtn').addEventListener('click', () => stop());
+
+    $('#seek').addEventListener('input', (e) => {
+      if (!state.duration) return;
+      const wasPlaying = state.isPlaying;
+      if (wasPlaying) pause();
+      state.startOffset = (+e.target.value / 1000) * state.duration;
+      updateTime();
+      updatePlayhead();
+      syncSvg(getCurrentFrame());
+      if (wasPlaying) play();
+    });
+
+    $('#sensitivity').addEventListener('input', (e) => $('#sensVal').textContent = e.target.value);
+
+    // Yatay scroll senkronu: grid kayarken ruler & waveform da kaysın
+    $('#gridScroll').addEventListener('scroll', (e) => {
+      const x = e.target.scrollLeft;
+      $('#rulerCanvas').style.transform = `translateX(${-x}px)`;
+      $('#waveformCanvas').style.transform = `translateX(${-x}px)`;
+    });
+
+    $('#zoomIn').addEventListener('click', () => {
+      state.pxPerFrame = Math.min(40, state.pxPerFrame + 2);
+      drawAll();
+    });
+    $('#zoomOut').addEventListener('click', () => {
+      state.pxPerFrame = Math.max(2, state.pxPerFrame - 2);
+      drawAll();
+    });
+
+    // SVG üzerinde ışık tıklayınca → o kanalı seçili frame'de toggle
+    $$('#teslaSvg .light').forEach((el) => {
+      el.style.cursor = 'pointer';
+      el.addEventListener('click', () => {
+        if (!state.frameCount) return;
+        const f = getCurrentFrame();
+        const c = +el.getAttribute('data-ch');
+        state.frames[f][c] ^= 1;
+        drawGrid();
+        syncSvg(f);
+      });
+    });
+
+    // Klavye kısayolları
+    window.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+      if (e.code === 'Space') { e.preventDefault(); state.isPlaying ? pause() : play(); }
+      if (e.code === 'KeyG') generateShow();
+    });
+
+    window.addEventListener('resize', () => {
+      // grid scroller width değişebilir; canvas'lar pxPerFrame bazlı olduğundan yeniden çizmeye gerek yok.
+    });
+  }
+
+  function drawAll() {
+    drawWaveform();
+    drawRuler();
+    drawGrid();
+    updatePlayhead();
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  Boot
+  // ─────────────────────────────────────────────────────────────
+  function init() {
+    state.duration = 0;
+    state.frameCount = 0;
+    state.frames = [];
+    bind();
+    setupGridInteraction();
+    drawAll();
+    syncSvg(0);
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+})();
