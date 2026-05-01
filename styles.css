@@ -174,6 +174,25 @@ input[type="number"], select {
   border-top: 1px solid var(--line);
   background: rgba(0, 0, 0, 0.25);
 }
+.model-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.35);
+  flex-wrap: wrap;
+}
+.model-btn {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.model-btn.ghost {
+  background: transparent;
+  border-color: var(--line);
+  opacity: 0.7;
+}
+.model-btn.ghost:hover { opacity: 1; }
 
 
 /* ───── Transport ───── */

@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="styles.css" />
   <!-- Three.js — global UMD (file:// uyumlu, modül CORS gerekmez) -->
   <script src="https://unpkg.com/three@0.148.0/build/three.min.js" defer></script>
+  <script src="https://unpkg.com/three@0.148.0/examples/js/loaders/GLTFLoader.js" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -41,6 +42,12 @@
         </header>
         <div class="svg-wrap">
           <div id="car3d" aria-label="Tesla Model Y Juniper 3B önizleme — sol tıkla sürükle ile döndür"></div>
+          <div class="model-bar">
+            <button id="loadModelBtn" class="model-btn">🚗 .glb Model Yükle</button>
+            <button id="useProcBtn" class="model-btn ghost" title="Proseduel modele dön">↺ Proseduel</button>
+            <span id="modelStatus" class="muted small"></span>
+            <input type="file" id="modelFile" accept=".glb,.gltf,model/gltf-binary" hidden />
+          </div>
           <div class="hint3d">🖱 Sol tık + sürükle döndür · sağ tık + sürükle kaydır · scroll yakınlaş</div>
         </div>
       </div>

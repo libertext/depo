@@ -797,7 +797,93 @@
     else window.addEventListener('car3d-ready', () => {
       wireCar3DClick();
       syncSvg(getCurrentFrame());
+      tryAutoLoadGLB();
     }, { once: true });
+
+    // ─── 3D model yükle (.glb) — diskten seç, IndexedDB'de sakla
+    const setModelStatus = (msg) => {
+      const el = $('#modelStatus');
+      if (el) el.textContent = msg || '';
+    };
+
+    $('#loadModelBtn')?.addEventListener('click', () => $('#modelFile').click());
+    $('#modelFile')?.addEventListener('change', async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      try {
+        setModelStatus('yükleniyor…');
+        const buf = await f.arrayBuffer();
+        await window.Car3D.loadGLB(buf);
+        await idbPutModel(f.name, buf);
+        setModelStatus(`✓ ${f.name} (${(buf.byteLength/1024/1024).toFixed(1)} MB)`);
+        toast(`Model yüklendi: ${f.name}`, 'ok');
+      } catch (err) {
+        console.error(err);
+        setModelStatus('hata');
+        toast('Model yüklenemedi: ' + (err?.message || err), 'error');
+      } finally {
+        e.target.value = '';
+      }
+    });
+    $('#useProcBtn')?.addEventListener('click', async () => {
+      window.Car3D.useProcedural();
+      await idbDeleteModel();
+      setModelStatus('proseduel');
+      toast('Proseduel modele döndü.');
+    });
+
+    async function tryAutoLoadGLB() {
+      try {
+        const rec = await idbGetModel();
+        if (!rec) return;
+        if (!window.Car3D?.hasGLTFLoader?.()) {
+          setModelStatus('GLTFLoader yok (internet?)');
+          return;
+        }
+        await window.Car3D.loadGLB(rec.buf);
+        const mb = (rec.buf.byteLength / 1024 / 1024).toFixed(1);
+        setModelStatus(`✓ ${rec.name} (${mb} MB · cached)`);
+      } catch (err) {
+        console.warn('[auto-glb]', err);
+      }
+    }
+
+    // IndexedDB helpers (key='current')
+    function idbOpen() {
+      return new Promise((res, rej) => {
+        const req = indexedDB.open('tlsm-models', 1);
+        req.onupgradeneeded = () => req.result.createObjectStore('m');
+        req.onsuccess = () => res(req.result);
+        req.onerror = () => rej(req.error);
+      });
+    }
+    async function idbPutModel(name, buf) {
+      const db = await idbOpen();
+      return new Promise((res, rej) => {
+        const tx = db.transaction('m', 'readwrite');
+        tx.objectStore('m').put({ name, buf, ts: Date.now() }, 'current');
+        tx.oncomplete = () => res();
+        tx.onerror = () => rej(tx.error);
+      });
+    }
+    async function idbGetModel() {
+      const db = await idbOpen();
+      return new Promise((res, rej) => {
+        const tx = db.transaction('m', 'readonly');
+        const r = tx.objectStore('m').get('current');
+        r.onsuccess = () => res(r.result || null);
+        r.onerror = () => rej(r.error);
+      });
+    }
+    async function idbDeleteModel() {
+      const db = await idbOpen();
+      return new Promise((res, rej) => {
+        const tx = db.transaction('m', 'readwrite');
+        tx.objectStore('m').delete('current');
+        tx.oncomplete = () => res();
+        tx.onerror = () => rej(tx.error);
+      });
+    }
 
     // Klavye kısayolları
     window.addEventListener('keydown', (e) => {

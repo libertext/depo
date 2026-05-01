@@ -615,11 +615,97 @@
     }
     loop();
 
+    // ─── GLB model yükleme & prosedüreli gizleme ──────────────
+    let loadedGLB = null;
+
+    function setProceduralVisible(show) {
+      // car group'unun ışık olmayan tüm child'larını gizle/göster
+      for (const child of car.children) {
+        if (child.userData.ch === undefined) child.visible = show;
+      }
+    }
+
+    function frameModel(obj) {
+      // Modelin merkezini orijine, tabanını yere koy. Boyut ~Tesla MY ölçüsünde.
+      const box = new THREE.Box3().setFromObject(obj);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.z);
+      const targetLen = 4.79;     // Model Y boyu
+      const scale = maxDim > 0 ? targetLen / maxDim : 1;
+      obj.scale.setScalar(scale);
+      obj.position.x = -center.x * scale;
+      obj.position.z = -center.z * scale;
+      obj.position.y = -box.min.y * scale;
+      obj.traverse((c) => {
+        if (c.isMesh) {
+          c.castShadow = true;
+          c.receiveShadow = true;
+          if (c.material && 'envMapIntensity' in c.material) {
+            c.material.envMapIntensity = 1.1;
+          }
+        }
+      });
+    }
+
+    function loadGLB(arrayBuffer) {
+      return new Promise((resolve, reject) => {
+        if (!THREE.GLTFLoader) {
+          reject(new Error('GLTFLoader yok'));
+          return;
+        }
+        const loader = new THREE.GLTFLoader();
+        loader.parse(arrayBuffer, '', (gltf) => {
+          // Eski modeli temizle
+          if (loadedGLB) {
+            scene.remove(loadedGLB);
+            loadedGLB.traverse((o) => {
+              if (o.isMesh) {
+                o.geometry?.dispose();
+                if (Array.isArray(o.material)) o.material.forEach((m) => m.dispose());
+                else o.material?.dispose();
+              }
+            });
+          }
+          const root = gltf.scene || gltf.scenes?.[0];
+          if (!root) { reject(new Error('Sahne yok')); return; }
+          frameModel(root);
+          scene.add(root);
+          loadedGLB = root;
+          // Proseduel gövdeyi gizle, ışıklar görünür kalsın (overlay)
+          setProceduralVisible(false);
+          // Mesh isimlerini logla — kanal eşleme için yararlı
+          const names = [];
+          root.traverse((o) => { if (o.isMesh && o.name) names.push(o.name); });
+          console.log(`[Car3D] GLB loaded — ${names.length} mesh:`, names);
+          resolve({ root, meshNames: names });
+        }, (err) => reject(err));
+      });
+    }
+
+    function useProcedural() {
+      if (loadedGLB) {
+        scene.remove(loadedGLB);
+        loadedGLB.traverse((o) => {
+          if (o.isMesh) {
+            o.geometry?.dispose();
+            if (Array.isArray(o.material)) o.material.forEach((m) => m.dispose());
+            else o.material?.dispose();
+          }
+        });
+        loadedGLB = null;
+      }
+      setProceduralVisible(true);
+    }
+
     window.Car3D = {
       syncChannels,
       onLightClick: (cb) => { onLightClick = cb; },
       setBodyColor: (hex) => { body.material.color.setHex(hex); },
       resetCamera: () => controls.reset(),
+      loadGLB,
+      useProcedural,
+      hasGLTFLoader: () => !!THREE.GLTFLoader,
     };
 
     window.dispatchEvent(new CustomEvent('car3d-ready'));
