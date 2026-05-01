@@ -1,0 +1,730 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Hukuk SEO · Anahtar Kelime Analizi</title>
+<style>
+  :root{
+    --bg:#0e1014; --panel:#161922; --panel-2:#1d2230;
+    --line:#262c3b; --text:#e7eaf0; --muted:#8b93a7;
+    --accent:#c9a14a; --accent-2:#e6c068; --good:#5fc88f;
+    --warn:#e0a23a; --bad:#e26a6a; --link:#7aa7ff;
+    --radius:10px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--link)}
+  header{padding:18px 24px;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:14px;background:#11141b}
+  header h1{margin:0;font-size:16px;font-weight:600;letter-spacing:.2px}
+  header .tag{font-size:11px;color:var(--accent);border:1px solid var(--accent);
+    padding:2px 8px;border-radius:99px;text-transform:uppercase;letter-spacing:1px}
+  header .sp{flex:1}
+  header button{background:transparent;color:var(--muted);border:1px solid var(--line);
+    padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px}
+  header button:hover{color:var(--text);border-color:var(--accent)}
+
+  main{display:grid;grid-template-columns:380px 1fr;gap:0;height:calc(100vh - 57px)}
+  @media (max-width:980px){main{grid-template-columns:1fr;height:auto}}
+
+  .left{padding:18px;border-right:1px solid var(--line);overflow:auto;background:var(--panel)}
+  .right{padding:18px;overflow:auto}
+
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:11px;text-transform:uppercase;
+    letter-spacing:1px;color:var(--muted);margin-bottom:6px}
+  .field input,.field textarea,.field select{
+    width:100%;background:var(--panel-2);color:var(--text);
+    border:1px solid var(--line);border-radius:8px;padding:9px 11px;
+    font:14px/1.5 inherit;outline:none}
+  .field input:focus,.field textarea:focus,.field select:focus{border-color:var(--accent)}
+  .field textarea{min-height:140px;resize:vertical;font-family:inherit}
+  .field .hint{font-size:11px;color:var(--muted);margin-top:4px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+  .btn{background:var(--accent);color:#1a1408;border:none;padding:10px 14px;
+    border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;width:100%}
+  .btn:hover{background:var(--accent-2)}
+  .btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
+  .btn.ghost:hover{border-color:var(--accent);color:var(--accent)}
+
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:16px;
+    overflow-x:auto}
+  .tabs button{background:transparent;border:none;color:var(--muted);
+    padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:2px solid transparent;
+    white-space:nowrap}
+  .tabs button.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .tabs button:hover{color:var(--text)}
+  .tab-panel{display:none}
+  .tab-panel.active{display:block}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;
+    margin-bottom:16px}
+  .stat{background:var(--panel);border:1px solid var(--line);
+    border-radius:var(--radius);padding:12px}
+  .stat .v{font-size:22px;font-weight:600;color:var(--accent)}
+  .stat .l{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-top:2px}
+  .stat.good .v{color:var(--good)}
+  .stat.warn .v{color:var(--warn)}
+  .stat.bad .v{color:var(--bad)}
+
+  .kw-list{display:flex;flex-direction:column;gap:6px}
+  .kw{display:flex;align-items:center;justify-content:space-between;
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:8px 12px;font-size:13px}
+  .kw:hover{border-color:var(--accent)}
+  .kw .text{flex:1;cursor:pointer}
+  .kw .meta{font-size:11px;color:var(--muted);margin-left:10px}
+  .kw .copy{background:transparent;border:none;color:var(--muted);cursor:pointer;
+    padding:2px 6px;font-size:13px}
+  .kw .copy:hover{color:var(--accent)}
+
+  .group{margin-bottom:20px}
+  .group h3{font-size:12px;text-transform:uppercase;letter-spacing:1.5px;
+    color:var(--accent);margin:0 0 10px 0;font-weight:600}
+
+  .density-table{width:100%;border-collapse:collapse;background:var(--panel);
+    border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .density-table th,.density-table td{padding:8px 12px;text-align:left;
+    border-bottom:1px solid var(--line);font-size:13px}
+  .density-table th{background:var(--panel-2);color:var(--muted);font-weight:500;
+    font-size:11px;text-transform:uppercase;letter-spacing:1px}
+  .density-table tr:last-child td{border-bottom:none}
+  .density-table .bar{display:inline-block;height:6px;background:var(--accent);
+    border-radius:3px;vertical-align:middle;margin-right:6px;min-width:2px}
+
+  .serp{background:#fff;color:#202124;padding:18px;border-radius:8px;
+    font-family:Arial,sans-serif;max-width:600px}
+  .serp .url{color:#202124;font-size:12px}
+  .serp .title{color:#1a0dab;font-size:20px;line-height:1.3;margin:2px 0 4px;
+    cursor:pointer}
+  .serp .title:hover{text-decoration:underline}
+  .serp .desc{color:#4d5156;font-size:14px;line-height:1.58}
+
+  .pill{display:inline-block;font-size:10px;padding:2px 7px;border-radius:99px;
+    margin-left:6px;vertical-align:middle;letter-spacing:.5px;text-transform:uppercase}
+  .pill.ok{background:#1c3727;color:var(--good);border:1px solid #2a5a3d}
+  .pill.warn{background:#3a2f15;color:var(--warn);border:1px solid #5a4a22}
+  .pill.bad{background:#3a1c1c;color:var(--bad);border:1px solid #5a2a2a}
+
+  .empty{color:var(--muted);font-style:italic;padding:20px;text-align:center}
+
+  .heading-tree{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px}
+  .heading-tree .h1{color:var(--accent-2);font-weight:600}
+  .heading-tree .h2{color:var(--text);margin-left:14px}
+  .heading-tree .h3{color:var(--muted);margin-left:28px}
+  .heading-tree .h4{color:var(--muted);margin-left:42px;font-size:12px}
+  .heading-tree div{padding:2px 0}
+
+  .toast{position:fixed;bottom:20px;right:20px;background:var(--accent);
+    color:#1a1408;padding:10px 18px;border-radius:8px;font-weight:600;font-size:13px;
+    opacity:0;transform:translateY(10px);transition:.2s;pointer-events:none;z-index:50}
+  .toast.show{opacity:1;transform:translateY(0)}
+
+  .slug{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel);
+    border:1px solid var(--line);padding:10px 12px;border-radius:8px;
+    word-break:break-all;cursor:pointer;font-size:13px;color:var(--accent-2)}
+  .slug:hover{border-color:var(--accent)}
+
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-track{background:var(--bg)}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:5px}
+  ::-webkit-scrollbar-thumb:hover{background:#3a4254}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Hukuk SEO</h1>
+  <span class="tag">Anahtar Kelime Analizi</span>
+  <span class="sp"></span>
+  <button id="btn-clear">Temizle</button>
+  <button id="btn-export">Dışa Aktar</button>
+</header>
+
+<main>
+  <section class="left">
+    <div class="field">
+      <label>Ana anahtar kelime</label>
+      <input id="in-kw" type="text" placeholder="ör. boşanma davası" autocomplete="off" />
+      <div class="hint">Tek bir hedef kelime / öbek yaz.</div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label>İl (opsiyonel)</label>
+        <select id="in-city">
+          <option value="">— seç —</option>
+          <option>İstanbul</option><option>Ankara</option><option>İzmir</option>
+          <option>Bursa</option><option>Antalya</option><option>Adana</option>
+          <option>Konya</option><option>Gaziantep</option><option>Kayseri</option>
+          <option>Kocaeli</option><option>Mersin</option><option>Eskişehir</option>
+          <option>Diyarbakır</option><option>Samsun</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Yıl</label>
+        <select id="in-year">
+          <option value="2026" selected>2026</option>
+          <option value="2025">2025</option>
+          <option value="">— yok —</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Hukuk alanı</label>
+      <select id="in-area">
+        <option value="genel">Genel</option>
+        <option value="aile">Aile / Boşanma</option>
+        <option value="ceza">Ceza Hukuku</option>
+        <option value="is">İş Hukuku</option>
+        <option value="icra">İcra / İflas</option>
+        <option value="ticaret">Ticaret / Şirketler</option>
+        <option value="gayrimenkul">Gayrimenkul / Kira</option>
+        <option value="miras">Miras</option>
+        <option value="trafik">Trafik / Tazminat</option>
+        <option value="idare">İdare / Vergi</option>
+        <option value="tuketici">Tüketici</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>İçerik / makale metni</label>
+      <textarea id="in-text" placeholder="Yazını buraya yapıştır. Yoğunluk ve okunabilirlik analizi yapılacak."></textarea>
+      <div class="hint">Metni yapıştırınca yoğunluk, kelime sayısı, okuma süresi otomatik hesaplanır.</div>
+    </div>
+
+    <div class="field">
+      <label>SEO başlık (title)</label>
+      <input id="in-title" type="text" placeholder="ör. Boşanma Davası Nasıl Açılır? 2026 Güncel Rehber" />
+      <div class="hint" id="title-hint">0 / 60</div>
+    </div>
+
+    <div class="field">
+      <label>Meta açıklama</label>
+      <textarea id="in-meta" style="min-height:70px" placeholder="120-160 karakter arası, ana kelime geçsin."></textarea>
+      <div class="hint" id="meta-hint">0 / 160</div>
+    </div>
+
+    <div class="field">
+      <label>Domain (URL önizlemesi için)</label>
+      <input id="in-domain" type="text" value="hukukburom.com" />
+    </div>
+
+    <button class="btn" id="btn-run">Analiz Et</button>
+  </section>
+
+  <section class="right">
+    <div class="tabs">
+      <button class="active" data-tab="suggest">Anahtar Kelime Önerileri</button>
+      <button data-tab="questions">Soru Önerileri</button>
+      <button data-tab="text">Metin Analizi</button>
+      <button data-tab="density">Kelime Yoğunluğu</button>
+      <button data-tab="serp">SERP Önizleme</button>
+      <button data-tab="headings">Başlık Yapısı</button>
+    </div>
+
+    <div class="tab-panel active" id="tab-suggest">
+      <div id="out-suggest" class="empty">Sol panelden ana anahtar kelime gir ve <b>Analiz Et</b>'e bas.</div>
+    </div>
+
+    <div class="tab-panel" id="tab-questions">
+      <div id="out-questions" class="empty">Soru bazlı uzun-kuyruk anahtar kelimeler burada görünecek.</div>
+    </div>
+
+    <div class="tab-panel" id="tab-text">
+      <div id="out-text" class="empty">İçerik metni gir, kelime sayısı / okuma süresi / okunabilirlik hesaplansın.</div>
+    </div>
+
+    <div class="tab-panel" id="tab-density">
+      <div id="out-density" class="empty">Metni yapıştır, en sık kullanılan kelimeler ve yoğunluk burada listelenecek.</div>
+    </div>
+
+    <div class="tab-panel" id="tab-serp">
+      <div id="out-serp" class="empty">Başlık ve meta açıklama gir, Google görünümünü buradan kontrol et.</div>
+    </div>
+
+    <div class="tab-panel" id="tab-headings">
+      <div id="out-headings" class="empty">Metin içine <code>H1: ...</code>, <code>H2: ...</code> şeklinde başlık koyarsan yapı buraya çıkar.</div>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast">Kopyalandı</div>
+
+<script>
+/* ============== TÜRKÇE STOP-WORDS ============== */
+const STOP = new Set(("ve veya ile ya da ki de da ama fakat ancak çünkü zira gibi olarak için "+
+  "bir bu şu o bunu şunu onu buna şuna ona bunda şunda onda bunun şunun onun "+
+  "ben sen biz siz onlar benim senin bizim sizin onların "+
+  "var yok olan olur oldu olmuş olacak olabilir olmalı edilir edildi yapılır yapıldı "+
+  "ise iken hem hem de eğer şayet sanki sanki gibi tabii "+
+  "her hiç bazı çoğu birçok birkaç tüm bütün herhangi "+
+  "daha en çok az fazla biraz oldukça kadar göre üzere "+
+  "ne nasıl niçin neden hangi kim kime kimi nerede nereye nereden ne zaman "+
+  "şey şeyler olarak yani işte ayrıca bunun yanı sıra ayrıca "+
+  "mı mi mu mü ki dahi bile sadece yalnızca "+
+  "evet hayır tabi tabii "+
+  "the and or of in to a is for on with at by an be it as that this").split(/\s+/));
+
+/* ============== HUKUK ALANINA GÖRE MODİFİER ============== */
+const AREA_MODS = {
+  genel: ["nedir","ne demek","nasıl yapılır","ücreti","masrafı","harcı","avukatı",
+          "dilekçesi","dilekçe örneği","şartları","süresi","zamanaşımı","cezası",
+          "örnek karar","yargıtay kararı","emsal karar","danışma","hukuk bürosu"],
+  aile: ["dilekçesi","anlaşmalı","çekişmeli","nafaka","velayet","mal paylaşımı",
+         "tazminat","avukat ücreti","ne kadar sürer","şartları","kanıt"],
+  ceza: ["cezası","hapis cezası","para cezası","ertelenmesi","hagb","tutuklama",
+         "savunma dilekçesi","beraat","istinaf","yargıtay","zamanaşımı","şikayet"],
+  is: ["kıdem tazminatı","ihbar tazminatı","fazla mesai","mobbing","işe iade",
+       "haksız fesih","istifa","iş mahkemesi","arabuluculuk","sgk","hesaplama"],
+  icra: ["takip","itiraz","itirazın iptali","haciz","ihtiyati haciz","menfi tespit",
+         "borçlu","alacaklı","ödeme emri","masrafı","avukat ücreti"],
+  ticaret: ["şirket kuruluşu","limited","anonim","fesih","tasfiye","ortaklık",
+            "haksız rekabet","çek","senet","ticaret sicil","sözleşme"],
+  gayrimenkul: ["kira sözleşmesi","tahliye","tapu iptali","ortaklığın giderilmesi",
+                "izale-i şüyu","kira tespit","emsal kira","müteahhit","kat karşılığı"],
+  miras: ["mirasçılık belgesi","veraset ilamı","tenkis davası","muris muvazaası",
+          "saklı pay","reddi miras","mirastan mal kaçırma","paylaşım"],
+  trafik: ["maddi tazminat","manevi tazminat","değer kaybı","kasko","trafik sigortası",
+           "kusur oranı","sgk rücu","ölümlü kaza","yaralanma"],
+  idare: ["iptal davası","tam yargı","istinaf","danıştay","vergi cezası","uzlaşma",
+          "ihale","kamulaştırma","disiplin cezası","memur"],
+  tuketici: ["hakem heyeti","ayıplı mal","cayma hakkı","mesafeli sözleşme","iade",
+             "garanti","kredi","bankacılık","abonelik","faiz"]
+};
+
+const QUESTION_TPL = [
+  "{kw} nedir?",
+  "{kw} ne demek?",
+  "{kw} nasıl açılır?",
+  "{kw} nasıl yapılır?",
+  "{kw} için hangi belgeler gerekir?",
+  "{kw} kaç gün sürer?",
+  "{kw} ne kadar sürer?",
+  "{kw} ne kadar tutar {year}?",
+  "{kw} ücretleri {year}",
+  "{kw} için avukat şart mı?",
+  "{kw} dilekçe örneği",
+  "{kw} zamanaşımı süresi nedir?",
+  "{kw} hangi mahkemede açılır?",
+  "{kw} nereye başvurulur?",
+  "{kw} şartları nelerdir?",
+  "{kw} masrafları ne kadar {year}?",
+  "{kw} sonrası ne olur?",
+  "{kw} reddedilirse ne olur?",
+  "{kw} arabuluculuk zorunlu mu?",
+  "{kw} {city} avukatı"
+];
+
+/* ============== YARDIMCILAR ============== */
+const $ = s => document.querySelector(s);
+const TR_MAP = {ç:"c",Ç:"c",ğ:"g",Ğ:"g",ı:"i",İ:"i",ö:"o",Ö:"o",ş:"s",Ş:"s",ü:"u",Ü:"u"};
+const slugify = s => s.toLowerCase()
+  .replace(/[çğıöşüÇĞİÖŞÜ]/g, c => TR_MAP[c] || c)
+  .replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,75);
+
+const tokenize = txt => (txt||"").toLowerCase()
+  .replace(/[^a-zçğıöşü0-9\s]/gi," ").split(/\s+/).filter(Boolean);
+
+const wordCount = txt => tokenize(txt).filter(w=>w.length>1).length;
+
+function readingMinutes(n){ return Math.max(1, Math.round(n/200)); }
+
+function toast(msg){ const t=$("#toast"); t.textContent=msg||"Kopyalandı";
+  t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),1400);}
+
+async function copy(text){ try{ await navigator.clipboard.writeText(text); toast("Kopyalandı: "+text.slice(0,40)); }catch(e){} }
+
+/* ============== ANAHTAR KELİME ÜRETİMİ ============== */
+function generateKeywords(kw, area, city, year){
+  const base = kw.trim();
+  if(!base) return [];
+  const mods = AREA_MODS[area] || AREA_MODS.genel;
+  const out = new Set();
+
+  out.add(base);
+  for(const m of mods){
+    out.add(`${base} ${m}`);
+  }
+  // city varyasyonları
+  if(city){
+    out.add(`${city} ${base}`);
+    out.add(`${base} ${city}`);
+    out.add(`${city} ${base} avukatı`);
+    out.add(`${city}'da ${base}`);
+    out.add(`en iyi ${city} ${base} avukatı`);
+  }
+  // yıl
+  if(year){
+    out.add(`${base} ${year}`);
+    out.add(`${base} ücretleri ${year}`);
+    out.add(`${base} güncel ${year}`);
+  }
+  // genel modifierler
+  out.add(`${base} avukat ücreti`);
+  out.add(`${base} hukuk bürosu`);
+  out.add(`online ${base} danışma`);
+  out.add(`ücretsiz ${base} danışma`);
+
+  // skor: kısa olan + base'i içeren öncelikli
+  return [...out].map(k => ({
+    text: k,
+    score: scoreKeyword(k, base, !!city, !!year)
+  })).sort((a,b)=>b.score-a.score);
+}
+
+function scoreKeyword(k, base, hasCity, hasYear){
+  let s = 50;
+  const wc = k.split(/\s+/).length;
+  if(wc>=3 && wc<=5) s += 20;          // long-tail sweet spot
+  if(wc>=6) s += 5;
+  if(wc===1) s -= 10;
+  if(/avukat|dilekçe|nasıl|nedir|ücret|masraf|şart/i.test(k)) s += 15;
+  if(/yargıtay|emsal|danıştay/i.test(k)) s += 5;
+  if(hasYear && /20\d{2}/.test(k)) s += 8;
+  if(hasCity) s += 4;
+  if(/online|ücretsiz/i.test(k)) s += 6;
+  return s;
+}
+
+function generateQuestions(kw, city, year){
+  if(!kw) return [];
+  const Y = year || "2026";
+  const C = city || "İstanbul";
+  return QUESTION_TPL.map(t => t.replace(/\{kw\}/g, kw).replace(/\{year\}/g, Y).replace(/\{city\}/g, C));
+}
+
+/* ============== METİN ANALİZİ ============== */
+function analyzeText(txt, kw){
+  const tokens = tokenize(txt).filter(w=>w.length>1);
+  const total = tokens.length;
+  const chars = txt.length;
+  const sentences = (txt.match(/[.!?]+/g)||[]).length || 1;
+  const avgSentLen = total / sentences;
+
+  // ana kelime yoğunluğu
+  const kwTokens = tokenize(kw).filter(w=>w.length>1);
+  let kwCount = 0;
+  if(kwTokens.length){
+    const phrase = kwTokens.join(" ");
+    const re = new RegExp("\\b"+phrase.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\b","gi");
+    kwCount = (txt.toLowerCase().match(re) || []).length;
+  }
+  const kwDensity = total ? (kwCount * kwTokens.length / total * 100) : 0;
+
+  return {
+    words: total,
+    chars: chars,
+    sentences: sentences,
+    avgSentLen: avgSentLen,
+    readingMin: readingMinutes(total),
+    kwCount, kwDensity
+  };
+}
+
+function topWords(txt, kw){
+  const tokens = tokenize(txt).filter(w => w.length>2 && !STOP.has(w));
+  const m = new Map();
+  for(const t of tokens) m.set(t, (m.get(t)||0)+1);
+  const total = tokens.length || 1;
+  const arr = [...m.entries()]
+    .map(([w,c])=>({w,c,p: c/total*100}))
+    .sort((a,b)=>b.c-a.c)
+    .slice(0,25);
+  return {arr, total};
+}
+
+function extractHeadings(txt){
+  // H1: / H2: / # / ## formatlarını yakala
+  const lines = txt.split(/\n/);
+  const out = [];
+  for(const ln of lines){
+    let m;
+    if(m = ln.match(/^\s*H([1-6])\s*[:.\-]\s*(.+)$/i)) out.push({lvl:+m[1], text:m[2].trim()});
+    else if(m = ln.match(/^(#{1,6})\s+(.+)$/)) out.push({lvl:m[1].length, text:m[2].trim()});
+  }
+  return out;
+}
+
+/* ============== RENDER ============== */
+function renderSuggest(list, kw){
+  if(!list.length){ $("#out-suggest").className="empty"; $("#out-suggest").textContent="Önce ana anahtar kelime gir."; return; }
+  const top = list.slice(0,40);
+  let html = `<div class="group"><h3>Önerilen Anahtar Kelimeler (${list.length})</h3><div class="kw-list">`;
+  for(const k of top){
+    const wc = k.text.split(/\s+/).length;
+    const pill = wc>=4 ? '<span class="pill ok">long-tail</span>'
+               : wc>=2 ? '<span class="pill warn">orta</span>'
+               : '<span class="pill bad">kısa</span>';
+    html += `<div class="kw"><span class="text" data-c="${escapeAttr(k.text)}">${escapeHtml(k.text)} ${pill}</span>
+      <span class="meta">skor ${k.score}</span>
+      <button class="copy" data-c="${escapeAttr(k.text)}">⧉</button></div>`;
+  }
+  html += `</div></div>`;
+
+  // slug üret
+  if(kw){
+    const slug = slugify(kw);
+    html += `<div class="group"><h3>URL Slug Önerisi</h3>
+      <div class="slug" data-c="${slug}">/${slug}/</div>
+      <div class="hint" style="color:var(--muted);font-size:11px;margin-top:6px">Tıkla, kopyala.</div></div>`;
+  }
+
+  const el = $("#out-suggest"); el.className=""; el.innerHTML = html;
+}
+
+function renderQuestions(qs){
+  if(!qs.length){ $("#out-questions").className="empty"; $("#out-questions").textContent="Önce ana anahtar kelime gir."; return; }
+  let html = `<div class="group"><h3>Soru Tabanlı Anahtar Kelimeler</h3>
+    <div class="hint" style="color:var(--muted);font-size:12px;margin-bottom:10px">
+    Bu soruları H2/H3 başlıklara, FAQ bölümüne ve içerik kurgusuna ekle. "People also ask" sinyalleri için kritik.</div>
+    <div class="kw-list">`;
+  for(const q of qs){
+    html += `<div class="kw"><span class="text" data-c="${escapeAttr(q)}">${escapeHtml(q)}</span>
+      <button class="copy" data-c="${escapeAttr(q)}">⧉</button></div>`;
+  }
+  html += `</div></div>`;
+  const el = $("#out-questions"); el.className=""; el.innerHTML = html;
+}
+
+function renderText(stats, kw){
+  if(!stats.words){ $("#out-text").className="empty"; $("#out-text").textContent="Sol panelde içerik metni boş."; return; }
+
+  const wcClass = stats.words<300 ? "bad" : stats.words<800 ? "warn" : "good";
+  const wcPill = stats.words<300 ? "Kısa (300+ hedefle)" : stats.words<800 ? "Orta" : stats.words<2500 ? "İyi" : "Çok uzun";
+
+  const dClass = !kw ? "" : (stats.kwDensity<0.5 ? "bad" : stats.kwDensity<=2.5 ? "good" : "warn");
+  const dPill = !kw ? "—" : stats.kwDensity<0.5 ? "Düşük" : stats.kwDensity<=2.5 ? "İdeal (0.5-2.5%)" : "Yüksek (spam riski)";
+
+  const sClass = stats.avgSentLen<25 ? "good" : stats.avgSentLen<35 ? "warn" : "bad";
+
+  let html = `<div class="stats">
+    <div class="stat ${wcClass}"><div class="v">${stats.words}</div><div class="l">Kelime</div></div>
+    <div class="stat"><div class="v">${stats.chars}</div><div class="l">Karakter</div></div>
+    <div class="stat"><div class="v">${stats.readingMin} dk</div><div class="l">Okuma</div></div>
+    <div class="stat ${sClass}"><div class="v">${stats.avgSentLen.toFixed(1)}</div><div class="l">Ort. Cümle Uz.</div></div>
+    <div class="stat ${dClass}"><div class="v">${stats.kwDensity.toFixed(2)}%</div><div class="l">Anahtar Yoğ.</div></div>
+    <div class="stat"><div class="v">${stats.kwCount}</div><div class="l">Anahtar Geçti</div></div>
+  </div>`;
+
+  html += `<div class="group"><h3>Değerlendirme</h3><ul style="line-height:1.8">
+    <li>Uzunluk: <b>${stats.words} kelime</b> — ${wcPill}.</li>
+    <li>Anahtar kelime yoğunluğu: <b>${stats.kwDensity.toFixed(2)}%</b> — ${dPill}.</li>
+    <li>Ortalama cümle uzunluğu: <b>${stats.avgSentLen.toFixed(1)} kelime</b> ${stats.avgSentLen<25?'(okunabilir)':stats.avgSentLen<35?'(orta)':'(uzun, böl)'}.</li>
+    <li>Hedef okuma süresi: <b>~${stats.readingMin} dakika</b>.</li>
+  </ul></div>`;
+
+  // tavsiyeler
+  const tips = [];
+  if(stats.words<800) tips.push("Hukuk içeriği için 1.000-2.500 kelime arası ideal — konuyu adımlara böl, dilekçe örneği ekle, FAQ bölümü koy.");
+  if(kw && stats.kwDensity<0.5) tips.push("Ana anahtar kelime metinde yeterince geçmiyor. H1, ilk paragraf, en az 2 H2 ve sonuç bölümünde geçir.");
+  if(kw && stats.kwDensity>2.5) tips.push("Anahtar yoğunluğu yüksek — eş anlamlılar, soru kalıpları ve genel hukuki terimlerle çeşitlendir.");
+  if(stats.avgSentLen>=35) tips.push("Cümleler çok uzun — 15-25 kelime hedefle. Hukuki terimleri sade dille parantez içinde açıkla.");
+  if(!/(KVKK|Reklam Yasağı|TBB|Türkiye Barolar Birliği)/i.test($("#in-text").value)) tips.push("Avukatlık reklam yasağı (TBB Meslek Kuralları m.8) gereği fiyat / başarı garantisi vaat eden ifadelerden kaçın.");
+  if(tips.length){
+    html += `<div class="group"><h3>İyileştirme Önerileri</h3><ul style="line-height:1.8">${tips.map(t=>`<li>${escapeHtml(t)}</li>`).join("")}</ul></div>`;
+  }
+
+  const el = $("#out-text"); el.className=""; el.innerHTML = html;
+}
+
+function renderDensity(top, kw){
+  if(!top.arr.length){ $("#out-density").className="empty"; $("#out-density").textContent="Metin boş."; return; }
+  const max = top.arr[0].c;
+  let html = `<div class="group"><h3>En Sık Kullanılan Kelimeler (stop-word'ler hariç)</h3>
+    <table class="density-table">
+      <thead><tr><th>#</th><th>Kelime</th><th>Adet</th><th>%</th><th></th></tr></thead><tbody>`;
+  top.arr.forEach((r,i)=>{
+    const w = Math.round(r.c/max*120);
+    const inKw = kw && kw.toLowerCase().includes(r.w);
+    html += `<tr><td>${i+1}</td>
+      <td>${inKw?'<b style="color:var(--accent-2)">'+escapeHtml(r.w)+'</b>':escapeHtml(r.w)}</td>
+      <td>${r.c}</td><td>${r.p.toFixed(2)}</td>
+      <td><span class="bar" style="width:${w}px"></span></td></tr>`;
+  });
+  html += `</tbody></table></div>`;
+  const el = $("#out-density"); el.className=""; el.innerHTML = html;
+}
+
+function renderSerp(title, meta, domain, slug, kw){
+  const t = title.trim(), m = meta.trim();
+  if(!t && !m){ $("#out-serp").className="empty"; $("#out-serp").textContent="Başlık veya meta gir."; return; }
+  const titleLen = t.length, metaLen = m.length;
+  const titlePill = titleLen===0 ? '<span class="pill bad">boş</span>'
+                  : titleLen<30 ? '<span class="pill warn">kısa</span>'
+                  : titleLen<=60 ? '<span class="pill ok">ideal 30-60</span>'
+                  : '<span class="pill bad">kesilebilir &gt;60</span>';
+  const metaPill = metaLen===0 ? '<span class="pill bad">boş</span>'
+                 : metaLen<120 ? '<span class="pill warn">kısa &lt;120</span>'
+                 : metaLen<=160 ? '<span class="pill ok">ideal 120-160</span>'
+                 : '<span class="pill bad">kesilebilir &gt;160</span>';
+
+  const kwLow = kw.toLowerCase();
+  const titleHasKw = kwLow && t.toLowerCase().includes(kwLow);
+  const metaHasKw  = kwLow && m.toLowerCase().includes(kwLow);
+
+  const url = `https://${domain}/${slug||""}`;
+  let html = `<div class="group"><h3>Google Sonuç Önizlemesi</h3>
+    <div class="serp">
+      <div class="url">${escapeHtml(url)}</div>
+      <div class="title" data-c="${escapeAttr(t)}">${escapeHtml(t.slice(0,60))}${t.length>60?'...':''}</div>
+      <div class="desc">${escapeHtml(m.slice(0,160))}${m.length>160?'...':''}</div>
+    </div></div>`;
+
+  html += `<div class="group"><h3>Kontrol Listesi</h3>
+    <ul style="line-height:2">
+      <li>Başlık uzunluğu: <b>${titleLen}</b> karakter ${titlePill}</li>
+      <li>Meta uzunluğu: <b>${metaLen}</b> karakter ${metaPill}</li>
+      <li>Başlıkta ana anahtar: ${titleHasKw?'<span class="pill ok">var</span>':'<span class="pill bad">yok</span>'}</li>
+      <li>Meta'da ana anahtar: ${metaHasKw?'<span class="pill ok">var</span>':'<span class="pill bad">yok</span>'}</li>
+      <li>URL slug: <code>${slug?escapeHtml(slug):'—'}</code></li>
+    </ul></div>`;
+
+  const el = $("#out-serp"); el.className=""; el.innerHTML = html;
+}
+
+function renderHeadings(hs){
+  if(!hs.length){
+    $("#out-headings").className="empty";
+    $("#out-headings").innerHTML = `Metin içine başlık yapısı bul<u>a</u>madım. Yazarken şu formatlardan birini kullan:<br><br>
+      <code>H1: Ana Başlık</code> · <code>H2: Alt Başlık</code><br>veya markdown: <code># Başlık</code> · <code>## Alt</code>`;
+    return;
+  }
+  const counts = {1:0,2:0,3:0,4:0,5:0,6:0};
+  for(const h of hs) counts[h.lvl]++;
+
+  let html = `<div class="stats">
+    <div class="stat ${counts[1]===1?'good':'bad'}"><div class="v">${counts[1]}</div><div class="l">H1</div></div>
+    <div class="stat"><div class="v">${counts[2]}</div><div class="l">H2</div></div>
+    <div class="stat"><div class="v">${counts[3]}</div><div class="l">H3</div></div>
+    <div class="stat"><div class="v">${counts[4]+counts[5]+counts[6]}</div><div class="l">H4-H6</div></div>
+  </div>`;
+
+  html += `<div class="group"><h3>Yapı</h3><div class="heading-tree">`;
+  for(const h of hs) html += `<div class="h${h.lvl}">H${h.lvl}: ${escapeHtml(h.text)}</div>`;
+  html += `</div></div>`;
+
+  const issues = [];
+  if(counts[1]!==1) issues.push("Bir tane H1 olmalı (şu an "+counts[1]+").");
+  if(counts[2]<2) issues.push("En az 2-3 H2 başlık ekle — Google içerik yapısını anlasın.");
+  if(counts[2]>0 && counts[3]===0 && hs.length>5) issues.push("H3 alt başlık yok — uzun bölümleri H3 ile böl.");
+  if(issues.length){
+    html += `<div class="group"><h3>Uyarılar</h3><ul style="line-height:1.8">${issues.map(i=>`<li>${i}</li>`).join("")}</ul></div>`;
+  }
+
+  const el = $("#out-headings"); el.className=""; el.innerHTML = html;
+}
+
+/* ============== ESCAPE ============== */
+function escapeHtml(s){return (s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function escapeAttr(s){return escapeHtml(s);}
+
+/* ============== EVENTS ============== */
+function run(){
+  const kw = $("#in-kw").value.trim();
+  const city = $("#in-city").value.trim();
+  const year = $("#in-year").value.trim();
+  const area = $("#in-area").value;
+  const txt = $("#in-text").value;
+  const title = $("#in-title").value;
+  const meta = $("#in-meta").value;
+  const domain = $("#in-domain").value.trim() || "site.com";
+  const slug = slugify(kw);
+
+  const kws = generateKeywords(kw, area, city, year);
+  const qs  = generateQuestions(kw, city, year);
+  const stats = analyzeText(txt, kw);
+  const tw = topWords(txt, kw);
+  const hs = extractHeadings(txt);
+
+  renderSuggest(kws, kw);
+  renderQuestions(qs);
+  renderText(stats, kw);
+  renderDensity(tw, kw);
+  renderSerp(title, meta, domain, slug, kw);
+  renderHeadings(hs);
+
+  // localStorage
+  localStorage.setItem("hukukseo:state", JSON.stringify({kw,city,year,area,txt,title,meta,domain}));
+}
+
+// karakter sayaçları
+function updateCounters(){
+  const t = $("#in-title").value.length;
+  $("#title-hint").textContent = `${t} / 60` + (t>60?" (Google kesebilir)":t<30&&t>0?" (kısa)":"");
+  const m = $("#in-meta").value.length;
+  $("#meta-hint").textContent = `${m} / 160` + (m>160?" (Google kesebilir)":m<120&&m>0?" (kısa)":"");
+}
+
+document.addEventListener("input", e => {
+  if(["in-title","in-meta"].includes(e.target.id)) updateCounters();
+});
+
+// tabs
+document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll(".tabs button").forEach(x=>x.classList.remove("active"));
+  document.querySelectorAll(".tab-panel").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");
+  document.getElementById("tab-"+b.dataset.tab).classList.add("active");
+}));
+
+// kopyalama (delegated)
+document.addEventListener("click", e => {
+  const c = e.target.closest("[data-c]");
+  if(c){ copy(c.dataset.c); }
+});
+
+$("#btn-run").addEventListener("click", run);
+$("#in-kw").addEventListener("keydown", e => { if(e.key==="Enter") run(); });
+
+$("#btn-clear").addEventListener("click", () => {
+  if(!confirm("Tüm alanları temizle?")) return;
+  ["in-kw","in-text","in-title","in-meta"].forEach(id=>$("#"+id).value="");
+  $("#in-city").value=""; $("#in-area").value="genel"; $("#in-year").value="2026";
+  localStorage.removeItem("hukukseo:state");
+  updateCounters();
+  document.querySelectorAll(".tab-panel > div").forEach(d => { d.className="empty"; d.textContent="Temizlendi."; });
+});
+
+$("#btn-export").addEventListener("click", () => {
+  const data = {
+    kw:$("#in-kw").value, city:$("#in-city").value, year:$("#in-year").value,
+    area:$("#in-area").value, title:$("#in-title").value, meta:$("#in-meta").value,
+    slug: slugify($("#in-kw").value), domain:$("#in-domain").value,
+    suggestions: generateKeywords($("#in-kw").value, $("#in-area").value, $("#in-city").value, $("#in-year").value).slice(0,40).map(x=>x.text),
+    questions: generateQuestions($("#in-kw").value, $("#in-city").value, $("#in-year").value),
+    stats: analyzeText($("#in-text").value, $("#in-kw").value),
+    headings: extractHeadings($("#in-text").value),
+    date: new Date().toISOString()
+  };
+  const blob = new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `seo-${slugify($("#in-kw").value)||"analiz"}-${Date.now()}.json`;
+  a.click();
+});
+
+// restore
+(function(){
+  try{
+    const s = JSON.parse(localStorage.getItem("hukukseo:state")||"null");
+    if(s){
+      $("#in-kw").value=s.kw||""; $("#in-city").value=s.city||"";
+      $("#in-year").value=s.year||"2026"; $("#in-area").value=s.area||"genel";
+      $("#in-text").value=s.txt||""; $("#in-title").value=s.title||"";
+      $("#in-meta").value=s.meta||""; $("#in-domain").value=s.domain||"hukukburom.com";
+      updateCounters();
+    }
+  }catch(e){}
+})();
+
+updateCounters();
+</script>
+</body>
+</html>
