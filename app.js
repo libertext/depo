@@ -567,10 +567,9 @@
   // ─────────────────────────────────────────────────────────────
   function syncSvg(frameIdx) {
     const row = state.frames[frameIdx] || new Uint8Array(MAX_CH);
-    $$('#teslaSvg .light').forEach((el) => {
-      const ch = +el.getAttribute('data-ch');
-      el.classList.toggle('on', !!row[ch]);
-    });
+    if (window.Car3D && window.Car3D.syncChannels) {
+      window.Car3D.syncChannels(row);
+    }
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -783,18 +782,22 @@
       drawAll();
     });
 
-    // SVG üzerinde ışık tıklayınca → o kanalı seçili frame'de toggle
-    $$('#teslaSvg .light').forEach((el) => {
-      el.style.cursor = 'pointer';
-      el.addEventListener('click', () => {
+    // 3D model üzerinde ışık tıklayınca → o kanalı seçili frame'de toggle
+    const wireCar3DClick = () => {
+      if (!window.Car3D || !window.Car3D.onLightClick) return;
+      window.Car3D.onLightClick((ch) => {
         if (!state.frameCount) return;
         const f = getCurrentFrame();
-        const c = +el.getAttribute('data-ch');
-        state.frames[f][c] ^= 1;
+        state.frames[f][ch] ^= 1;
         drawGrid();
         syncSvg(f);
       });
-    });
+    };
+    if (window.Car3D) wireCar3DClick();
+    else window.addEventListener('car3d-ready', () => {
+      wireCar3DClick();
+      syncSvg(getCurrentFrame());
+    }, { once: true });
 
     // Klavye kısayolları
     window.addEventListener('keydown', (e) => {

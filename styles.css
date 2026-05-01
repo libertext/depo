@@ -148,38 +148,33 @@ input[type="number"], select {
 
 /* ───── Visualizer ───── */
 .svg-wrap {
-  padding: 12px;
-  display: grid;
-  place-items: center;
+  position: relative;
+  display: flex;
+  flex-direction: column;
   background:
-    radial-gradient(400px 200px at 50% 50%, rgba(87, 245, 255, 0.05), transparent 70%),
+    radial-gradient(500px 260px at 50% 40%, rgba(87, 245, 255, 0.07), transparent 70%),
+    radial-gradient(400px 200px at 80% 80%, rgba(227, 25, 55, 0.05), transparent 70%),
     var(--bg-2);
   border-radius: 0 0 var(--radius) var(--radius);
+  overflow: hidden;
 }
-#teslaSvg { width: 100%; max-width: 460px; height: auto; }
+#car3d {
+  width: 100%;
+  height: 320px;
+  cursor: grab;
+  touch-action: none;
+}
+#car3d:active { cursor: grabbing; }
+#car3d canvas { display: block; outline: none; }
+.hint3d {
+  padding: 6px 12px 8px;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  border-top: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.25);
+}
 
-#teslaSvg .body {
-  fill: #1a2230;
-  stroke: #2a3445;
-  stroke-width: 2;
-}
-#teslaSvg .cabin { fill: #0d141d; stroke: #2a3445; stroke-width: 1.5; }
-#teslaSvg .cabin-line { stroke: #2a3445; stroke-width: 1; }
-#teslaSvg .light {
-  fill: #2a3445;
-  stroke: #3a4658;
-  stroke-width: 1;
-  transition: fill 0.05s, filter 0.05s;
-}
-#teslaSvg .light.on.headlight { fill: #fff7d6; filter: drop-shadow(0 0 8px #ffe27a); }
-#teslaSvg .light.on.highbeam  { fill: #ffffff; filter: drop-shadow(0 0 14px #ffffff); }
-#teslaSvg .light.on.fog       { fill: #fff0a8; filter: drop-shadow(0 0 6px #ffd96a); }
-#teslaSvg .light.on.tail      { fill: #ff3a4a; filter: drop-shadow(0 0 10px #ff3a4a); }
-#teslaSvg .light.on.reverse   { fill: #ffffff; filter: drop-shadow(0 0 8px #cfd8ff); }
-#teslaSvg .light.on.plate     { fill: #f3f4f6; filter: drop-shadow(0 0 4px #fff); }
-#teslaSvg .light.on.outline   { fill: var(--neon); filter: drop-shadow(0 0 8px var(--neon)); }
-#teslaSvg .light.on.signal    { fill: var(--warn); filter: drop-shadow(0 0 10px var(--warn)); }
-#teslaSvg .light.on.closure   { fill: #c084fc; filter: drop-shadow(0 0 6px #c084fc); }
 
 /* ───── Transport ───── */
 .transport {

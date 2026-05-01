@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Tesla Light Show Maker</title>
   <link rel="stylesheet" href="styles.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
 </head>
 <body>
   <header class="topbar">
@@ -34,51 +42,12 @@
     <section class="left-pane">
       <div class="visualizer card">
         <header class="card-h">
-          <h3>Canlı Önizleme</h3>
+          <h3>Canlı Önizleme · Model Y Juniper 2025</h3>
           <span id="frameDisplay" class="muted small">frame 0 / 0</span>
         </header>
         <div class="svg-wrap">
-          <svg id="teslaSvg" viewBox="0 0 600 320" xmlns="http://www.w3.org/2000/svg" aria-label="Tesla üstten görünüm">
-            <rect x="120" y="40" width="360" height="240" rx="80" ry="80" class="body" />
-            <rect x="200" y="80" width="200" height="160" rx="40" ry="40" class="cabin" />
-            <line x1="300" y1="80" x2="300" y2="240" class="cabin-line" />
-
-            <circle data-ch="6"  cx="160" cy="60"  r="12" class="light headlight" data-name="Far Sol İç" />
-            <circle data-ch="7"  cx="135" cy="68"  r="10" class="light headlight" data-name="Far Sol Dış" />
-            <circle data-ch="8"  cx="440" cy="60"  r="12" class="light headlight" data-name="Far Sağ İç" />
-            <circle data-ch="9"  cx="465" cy="68"  r="10" class="light headlight" data-name="Far Sağ Dış" />
-            <rect   data-ch="10" x="270" y="46"   width="60" height="6" rx="3" class="light highbeam" data-name="Uzun Far" />
-            <rect   data-ch="11" x="180" y="48"   width="40" height="4" rx="2" class="light fog" data-name="Sis Sol" />
-            <rect   data-ch="11" x="380" y="48"   width="40" height="4" rx="2" class="light fog" data-name="Sis Sağ" />
-
-            <rect data-ch="12" x="135" y="260" width="60" height="14" rx="4" class="light tail" data-name="Stop Sol" />
-            <rect data-ch="13" x="405" y="260" width="60" height="14" rx="4" class="light tail" data-name="Stop Sağ" />
-            <rect data-ch="14" x="270" y="266" width="60" height="6"  rx="3" class="light reverse" data-name="Geri Vites" />
-            <rect data-ch="15" x="285" y="276" width="30" height="4"  rx="2" class="light plate" data-name="Plaka" />
-
-            <rect data-ch="0" x="115" y="48"  width="14" height="60" rx="6" class="light outline" data-name="Outline Sol Ön" />
-            <rect data-ch="1" x="471" y="48"  width="14" height="60" rx="6" class="light outline" data-name="Outline Sağ Ön" />
-            <rect data-ch="2" x="115" y="130" width="14" height="60" rx="6" class="light outline" data-name="Outline Sol Yan" />
-            <rect data-ch="3" x="471" y="130" width="14" height="60" rx="6" class="light outline" data-name="Outline Sağ Yan" />
-            <rect data-ch="4" x="115" y="212" width="14" height="60" rx="6" class="light outline" data-name="Outline Sol Arka" />
-            <rect data-ch="5" x="471" y="212" width="14" height="60" rx="6" class="light outline" data-name="Outline Sağ Arka" />
-
-            <circle data-ch="16" cx="128" cy="40"  r="6" class="light signal" data-name="Sinyal Sol" />
-            <circle data-ch="17" cx="472" cy="40"  r="6" class="light signal" data-name="Sinyal Sağ" />
-            <circle data-ch="18" cx="128" cy="160" r="5" class="light signal" data-name="Yan Sinyal Sol" />
-            <circle data-ch="19" cx="472" cy="160" r="5" class="light signal" data-name="Yan Sinyal Sağ" />
-
-            <rect data-ch="20" x="200" y="105" width="6" height="40" class="light closure" data-name="Kapı Ön Sol" />
-            <rect data-ch="21" x="394" y="105" width="6" height="40" class="light closure" data-name="Kapı Ön Sağ" />
-            <rect data-ch="22" x="200" y="175" width="6" height="40" class="light closure" data-name="Kapı Arka Sol" />
-            <rect data-ch="23" x="394" y="175" width="6" height="40" class="light closure" data-name="Kapı Arka Sağ" />
-            <rect data-ch="24" x="208" y="100" width="38" height="4" class="light closure" data-name="Pencere Sol Ön" />
-            <rect data-ch="25" x="354" y="100" width="38" height="4" class="light closure" data-name="Pencere Sağ Ön" />
-            <rect data-ch="26" x="270" y="244" width="60" height="8" class="light closure" data-name="Bagaj" />
-            <rect data-ch="27" x="270" y="68"  width="60" height="8" class="light closure" data-name="Frunk" />
-            <circle data-ch="28" cx="105" cy="240" r="5" class="light closure" data-name="Şarj Portu" />
-            <rect data-ch="29" x="178" y="135" width="6" height="22" class="light closure" data-name="Aynalar" />
-          </svg>
+          <div id="car3d" aria-label="Tesla Model Y Juniper 3B önizleme — sol tıkla sürükle ile döndür"></div>
+          <div class="hint3d">🖱 Sol tık + sürükle döndür · sağ tık + sürükle kaydır · scroll yakınlaş</div>
         </div>
       </div>
 
@@ -149,6 +118,7 @@
   </main>
 
   <div id="toast" class="toast" hidden></div>
+  <script type="module" src="car3d.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
