@@ -674,11 +674,32 @@
           loadedGLB = root;
           // Proseduel gövdeyi gizle, ışıklar görünür kalsın (overlay)
           setProceduralVisible(false);
-          // Mesh isimlerini logla — kanal eşleme için yararlı
+          // Mesh debug — isim, dünya pozisyonu, boyut, materyal rengi
           const names = [];
-          root.traverse((o) => { if (o.isMesh && o.name) names.push(o.name); });
-          console.log(`[Car3D] GLB loaded — ${names.length} mesh:`, names);
-          resolve({ root, meshNames: names });
+          const debug = [];
+          const totalBox = new THREE.Box3().setFromObject(root);
+          const totalSize = totalBox.getSize(new THREE.Vector3());
+          const totalCenter = totalBox.getCenter(new THREE.Vector3());
+          root.traverse((o) => {
+            if (!o.isMesh) return;
+            names.push(o.name || '(noname)');
+            const bb = new THREE.Box3().setFromObject(o);
+            const c = bb.getCenter(new THREE.Vector3()).sub(totalCenter);
+            const s = bb.getSize(new THREE.Vector3());
+            const col = (o.material && o.material.color)
+              ? '#' + o.material.color.getHexString() : '?';
+            debug.push({
+              name: o.name || '(noname)',
+              relX: +c.x.toFixed(2), relY: +c.y.toFixed(2), relZ: +c.z.toFixed(2),
+              w: +s.x.toFixed(2), h: +s.y.toFixed(2), d: +s.z.toFixed(2),
+              color: col,
+            });
+          });
+          console.log(`[Car3D] GLB total bbox:`,
+            `L=${totalSize.x.toFixed(2)} H=${totalSize.y.toFixed(2)} W=${totalSize.z.toFixed(2)}`);
+          console.log(`[Car3D] GLB ${names.length} mesh:`);
+          console.table(debug);
+          resolve({ root, meshNames: names, debug });
         }, (err) => reject(err));
       });
     }
