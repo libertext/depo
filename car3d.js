@@ -21,8 +21,6 @@
     if (!container) return;
     if (!window.THREE) return fail('THREE bulunamadı');
     const THREE = window.THREE;
-    const OrbitControlsCtor = THREE.OrbitControls;
-    if (!OrbitControlsCtor) return fail('OrbitControls bulunamadı');
 
     // ─── Renderer / scene / camera ─────────────────────────────
     const scene = new THREE.Scene();
@@ -43,15 +41,16 @@
     container.appendChild(renderer.domElement);
 
     const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
-    camera.position.set(7.5, 3.4, 7.0);
-
-    const controls = new OrbitControlsCtor(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.08;
-    controls.minDistance = 4.5;
-    controls.maxDistance = 18;
-    controls.maxPolarAngle = Math.PI * 0.49;
-    controls.target.set(0, 0.85, 0);
+    const controls = createOrbitControls(camera, renderer.domElement, {
+      target: new THREE.Vector3(0, 0.85, 0),
+      radius: 10.5,
+      theta: Math.PI * 0.25,        // ön-sağ açı
+      phi: Math.PI * 0.36,          // yukarıdan bakış
+      minRadius: 4.5,
+      maxRadius: 22,
+      minPhi: 0.08,
+      maxPhi: Math.PI * 0.49,
+    });
     controls.update();
 
     // ─── Aydınlatma ────────────────────────────────────────────
@@ -483,14 +482,110 @@
       syncChannels,
       onLightClick: (cb) => { onLightClick = cb; },
       setBodyColor: (hex) => { body.material.color.setHex(hex); },
-      resetCamera: () => {
-        camera.position.set(7.5, 3.4, 7.0);
-        controls.target.set(0, 0.85, 0);
-        controls.update();
-      },
+      resetCamera: () => controls.reset(),
     };
 
     window.dispatchEvent(new CustomEvent('car3d-ready'));
+  }
+
+  // ─── Minimal orbit controls (kendi yazımımız, OrbitControls bağımlılığı yok)
+  // Sol-tık + sürükle = döndür · sağ-tık + sürükle = pan · scroll = zoom
+  function createOrbitControls(camera, dom, opts) {
+    const THREE = window.THREE;
+    const target  = opts.target.clone();
+    const initial = {
+      target: target.clone(),
+      radius: opts.radius,
+      theta:  opts.theta,
+      phi:    opts.phi,
+    };
+    let radius = opts.radius;
+    let theta  = opts.theta;
+    let phi    = opts.phi;
+    // damping hedefleri
+    let tTheta = theta, tPhi = phi, tRadius = radius;
+    const tTarget = target.clone();
+
+    const minR = opts.minRadius ?? 3;
+    const maxR = opts.maxRadius ?? 30;
+    const minPhi = opts.minPhi ?? 0.05;
+    const maxPhi = opts.maxPhi ?? Math.PI - 0.05;
+
+    let mode = null;       // 'rotate' | 'pan' | null
+    let lastX = 0, lastY = 0;
+    let activePointerId = null;
+
+    function update() {
+      // damping (lerp)
+      theta  += (tTheta  - theta)  * 0.18;
+      phi    += (tPhi    - phi)    * 0.18;
+      radius += (tRadius - radius) * 0.18;
+      target.lerp(tTarget, 0.18);
+
+      const sinPhi = Math.sin(phi);
+      camera.position.x = target.x + radius * sinPhi * Math.cos(theta);
+      camera.position.y = target.y + radius * Math.cos(phi);
+      camera.position.z = target.z + radius * sinPhi * Math.sin(theta);
+      camera.up.set(0, 1, 0);
+      camera.lookAt(target);
+    }
+
+    dom.style.touchAction = 'none';
+    dom.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    dom.addEventListener('pointerdown', (e) => {
+      if (activePointerId !== null) return;
+      mode = (e.button === 2 || e.shiftKey) ? 'pan' : 'rotate';
+      lastX = e.clientX; lastY = e.clientY;
+      activePointerId = e.pointerId;
+      try { dom.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    dom.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== activePointerId || !mode) return;
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      lastX = e.clientX; lastY = e.clientY;
+      if (mode === 'rotate') {
+        tTheta -= dx * 0.0065;
+        tPhi   -= dy * 0.0065;
+        if (tPhi < minPhi) tPhi = minPhi;
+        if (tPhi > maxPhi) tPhi = maxPhi;
+      } else {
+        // ekran düzlemine göre pan
+        const panScale = radius * 0.0018;
+        const right = new THREE.Vector3();
+        const up    = new THREE.Vector3();
+        right.setFromMatrixColumn(camera.matrix, 0);
+        up.setFromMatrixColumn(camera.matrix, 1);
+        right.multiplyScalar(-dx * panScale);
+        up.multiplyScalar(   dy * panScale);
+        tTarget.add(right).add(up);
+      }
+    });
+    function endDrag(e) {
+      if (e.pointerId !== activePointerId) return;
+      activePointerId = null;
+      mode = null;
+      try { dom.releasePointerCapture(e.pointerId); } catch (_) {}
+    }
+    dom.addEventListener('pointerup', endDrag);
+    dom.addEventListener('pointercancel', endDrag);
+
+    dom.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const factor = Math.exp(e.deltaY * 0.0012);
+      tRadius = Math.max(minR, Math.min(maxR, tRadius * factor));
+    }, { passive: false });
+
+    return {
+      update,
+      reset() {
+        tTarget.copy(initial.target);
+        tTheta = initial.theta;
+        tPhi   = initial.phi;
+        tRadius = initial.radius;
+      },
+    };
   }
 
   // defer scriptleri DOM hazır olunca çalışır
