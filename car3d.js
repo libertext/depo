@@ -617,12 +617,101 @@
 
     // ─── GLB model yükleme & prosedüreli gizleme ──────────────
     let loadedGLB = null;
+    const glbRegisteredMeshes = [];   // GLB'den lightChannels'a eklenen mesh'ler
 
     function setProceduralVisible(show) {
       // car group'unun ışık olmayan tüm child'larını gizle/göster
       for (const child of car.children) {
         if (child.userData.ch === undefined) child.visible = show;
       }
+    }
+
+    function setOverlayVisibility(ch, show) {
+      // car group içindeki overlay (proseduel) ışık mesh'lerini ch'e göre aç/kapat
+      for (const child of car.children) {
+        if (child.userData.ch === ch && !child.userData.fromGLB) {
+          if (child.userData.hideWhenOff && !show) child.visible = false;
+          else child.visible = show;
+        }
+      }
+    }
+
+    function channelColor(ch) {
+      if (ch <= 5)  return 0x57f5ff;   // outline cyan
+      if (ch <= 9)  return 0xfff7d6;   // headlight warm
+      if (ch === 10) return 0xffffff;  // high beam
+      if (ch === 11) return 0xffd96a;  // fog
+      if (ch <= 13) return 0xff2d3e;   // tail/stop red
+      if (ch === 14) return 0xffffff;  // reverse
+      if (ch === 15) return 0xfff8e8;  // plate
+      if (ch <= 19) return 0xffb454;   // signal amber
+      return 0xc084fc;                 // closure purple
+    }
+
+    // 2025 Tesla Model Y Juniper GLB (kullanıcı modeline özel) eşleme.
+    // Mesh adı → kanal listesi. Aynı mesh birden fazla kanalı temsil edebilir.
+    const TESLA_GLB_MAP = {
+      'Object_5':  [0, 1, 10],         // ön DRL bar (sol/sağ outline + uzun far)
+      'Object_6':  [6, 7, 8, 9],       // far kümesi (4 segment ortak)
+      'Object_2':  [4, 5],             // arka LED bar (sol/sağ outline)
+      'Object_37': [12, 13],           // stop sol/sağ
+      'Object_21': [12, 13],           // brake strip — stop'la birlikte
+    };
+
+    function applyGLBChannelMap(root, map) {
+      for (const [meshName, channels] of Object.entries(map)) {
+        const mesh = root.getObjectByName(meshName);
+        if (!mesh || !mesh.isMesh) {
+          console.warn('[Car3D] map mesh bulunamadı:', meshName);
+          continue;
+        }
+        // Materyali clone'la (paylaşımlı materyali bozma)
+        if (!mesh.userData._origMat) {
+          mesh.userData._origMat = mesh.material;
+          const cloned = Array.isArray(mesh.material)
+            ? mesh.material.map((m) => m.clone())
+            : mesh.material.clone();
+          mesh.material = cloned;
+        }
+        const targetMat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+        // İlk kanalın rengini taban olarak ayarla
+        targetMat.emissive = new THREE.Color(channelColor(channels[0]));
+        targetMat.emissiveIntensity = 0;
+        mesh.userData.fromGLB = true;
+        mesh.userData.channels = channels.slice();
+        glbRegisteredMeshes.push(mesh);
+        for (const ch of channels) {
+          if (!lightChannels.has(ch)) lightChannels.set(ch, []);
+          lightChannels.get(ch).push(mesh);
+          // overlay'i bu kanal için gizle (hideWhenOff false dahi olsa)
+          for (const child of car.children) {
+            if (child.userData.ch === ch && !child.userData.fromGLB) {
+              child.visible = false;
+            }
+          }
+        }
+      }
+    }
+
+    function unmapGLBChannels() {
+      // GLB mesh'lerini lightChannels'tan çıkar, materyallerini geri yükle
+      for (const mesh of glbRegisteredMeshes) {
+        if (mesh.userData._origMat) {
+          mesh.material = mesh.userData._origMat;
+          delete mesh.userData._origMat;
+        }
+        for (const ch of mesh.userData.channels || []) {
+          const arr = lightChannels.get(ch);
+          if (arr) {
+            const idx = arr.indexOf(mesh);
+            if (idx >= 0) arr.splice(idx, 1);
+            if (arr.length === 0) lightChannels.delete(ch);
+          }
+        }
+        delete mesh.userData.fromGLB;
+        delete mesh.userData.channels;
+      }
+      glbRegisteredMeshes.length = 0;
     }
 
     function frameModel(obj) {
@@ -656,8 +745,9 @@
         }
         const loader = new THREE.GLTFLoader();
         loader.parse(arrayBuffer, '', (gltf) => {
-          // Eski modeli temizle
+          // Eski modeli ve eşlemeleri temizle
           if (loadedGLB) {
+            unmapGLBChannels();
             scene.remove(loadedGLB);
             loadedGLB.traverse((o) => {
               if (o.isMesh) {
@@ -669,11 +759,17 @@
           }
           const root = gltf.scene || gltf.scenes?.[0];
           if (!root) { reject(new Error('Sahne yok')); return; }
+          // GLB orientation: bu Tesla modelinin +Z'si front, benim koordinatımda +X = front
+          // Y ekseninde +π/2 döndürerek hizala
+          root.rotation.y = Math.PI / 2;
+          root.updateMatrixWorld(true);
           frameModel(root);
           scene.add(root);
           loadedGLB = root;
-          // Proseduel gövdeyi gizle, ışıklar görünür kalsın (overlay)
+          // Proseduel gövdeyi gizle
           setProceduralVisible(false);
+          // Eşlemeleri uygula — modelin gerçek farları/stop'ları kanallara bağlanır
+          applyGLBChannelMap(root, TESLA_GLB_MAP);
           // Mesh debug — isim, dünya pozisyonu, boyut, materyal rengi
           const names = [];
           const debug = [];
@@ -706,6 +802,7 @@
 
     function useProcedural() {
       if (loadedGLB) {
+        unmapGLBChannels();
         scene.remove(loadedGLB);
         loadedGLB.traverse((o) => {
           if (o.isMesh) {
@@ -717,6 +814,16 @@
         loadedGLB = null;
       }
       setProceduralVisible(true);
+      // Tüm overlay ışıkları geri görünür yap (hideWhenOff'lar mevcut state'e göre senkronize edilir)
+      for (const child of car.children) {
+        if (child.userData.ch !== undefined && !child.userData.fromGLB) {
+          if (child.userData.hideWhenOff) {
+            child.visible = (child.material.emissiveIntensity || 0) > 0;
+          } else {
+            child.visible = true;
+          }
+        }
+      }
     }
 
     window.Car3D = {
