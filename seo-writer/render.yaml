@@ -1,0 +1,21 @@
+# One-click deploy blueprint for Render (https://render.com)
+# 1. Push this repo to GitHub.
+# 2. Render Dashboard → New → Blueprint → pick this repo.
+# 3. Set ANTHROPIC_API_KEY and ACCESS_TOKENS in the dashboard (they're marked
+#    sync:false so they are NOT stored in git).
+services:
+  - type: web
+    name: seo-article-writer
+    runtime: node
+    rootDir: seo-writer
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ACCESS_TOKENS
+        sync: false
+      - key: MODEL
+        value: claude-sonnet-4-6
+      - key: RATE_LIMIT_PER_MIN
+        value: "12"

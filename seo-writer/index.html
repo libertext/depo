@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0e1526" />
+  <title>RankPen · AI SEO Makale Stüdyosu</title>
+  <meta name="description" content="Yapay zeka ile Google'da üst sıralara çıkacak SEO uyumlu makaleler üretin. Çok dilli, meta etiketli, schema hazır." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='52' font-size='52'%3E%E2%9C%8D%EF%B8%8F%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ============================ TOP BAR ============================ -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">✍️</span>
+      <div class="brand-text">
+        <h1 id="brand-name">RankPen</h1>
+        <p id="brand-tag">AI SEO Makale Stüdyosu</p>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab is-active" data-tab="write" role="tab" aria-selected="true">📝 Yaz</button>
+      <button class="tab" data-tab="bulk" role="tab" aria-selected="false">⚡ Toplu Üret</button>
+      <button class="tab" data-tab="archive" role="tab" aria-selected="false">
+        🗂️ Arşiv <span class="count" id="archiveCount">0</span>
+      </button>
+      <span class="conn-dot" id="conn-dot" title="Bağlantı durumu"></span>
+      <button class="icon-btn" id="btn-settings" title="Ayarlar" aria-label="Ayarlar">⚙️</button>
+    </nav>
+  </header>
+
+  <main class="container">
+
+    <!-- ============================ WRITE VIEW ============================ -->
+    <section class="view is-active" id="view-write" role="tabpanel">
+      <div class="grid">
+
+        <!-- ---- form ---- -->
+        <div class="card form-card">
+          <div class="card-head">
+            <h2>Makale Ayarları</h2>
+            <div class="head-actions">
+              <button class="btn ghost" id="btn-ideas" title="Yapay zeka konu önersin">💡 Konu Öner</button>
+              <button class="btn ghost" id="btn-clear" title="Formu temizle">🧹 Temizle</button>
+            </div>
+          </div>
+
+          <label class="field">
+            <span class="label">Konu Başlığı <em>(⚡ ile AI tüm makaleyi yazar)</em></span>
+            <div class="input-row">
+              <input type="text" id="f-topic" placeholder="Örn. Yeni başlayanlar için balkonda sebze yetiştirme rehberi" maxlength="150" />
+              <button type="button" class="btn primary gen-btn" id="btn-gen">⚡ Üret</button>
+            </div>
+            <span class="hint"><span id="c-topic">0</span>/150 karakter</span>
+          </label>
+
+          <div class="row-2">
+            <label class="field">
+              <span class="label">Çıktı Dili</span>
+              <select id="f-language">
+                <option value="Türkçe">🇹🇷 Türkçe</option>
+                <option value="English">🇬🇧 English</option>
+                <option value="Deutsch">🇩🇪 Deutsch</option>
+                <option value="Français">🇫🇷 Français</option>
+                <option value="Español">🇪🇸 Español</option>
+                <option value="Italiano">🇮🇹 Italiano</option>
+                <option value="Português">🇵🇹 Português</option>
+                <option value="Nederlands">🇳🇱 Nederlands</option>
+                <option value="Русский">🇷🇺 Русский</option>
+                <option value="العربية">🇸🇦 العربية</option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="label">Kategori</span>
+              <select id="f-category">
+                <option value="Genel / Karışık">Genel / Karışık</option>
+                <option value="Teknoloji / Yazılım">Teknoloji / Yazılım</option>
+                <option value="Sağlık / Yaşam">Sağlık / Yaşam</option>
+                <option value="Finans / Ekonomi">Finans / Ekonomi</option>
+                <option value="Hukuk / Mevzuat">Hukuk / Mevzuat</option>
+                <option value="Eğitim / Kişisel Gelişim">Eğitim / Kişisel Gelişim</option>
+                <option value="İş / Girişim / Pazarlama">İş / Girişim / Pazarlama</option>
+                <option value="E-ticaret / Ürün">E-ticaret / Ürün</option>
+                <option value="Yemek / Tarif">Yemek / Tarif</option>
+                <option value="Seyahat / Gezi">Seyahat / Gezi</option>
+                <option value="Moda / Güzellik">Moda / Güzellik</option>
+                <option value="Spor / Fitness">Spor / Fitness</option>
+                <option value="Ev / Dekorasyon">Ev / Dekorasyon</option>
+                <option value="Oyun / Eğlence">Oyun / Eğlence</option>
+                <option value="Emlak / Gayrimenkul">Emlak / Gayrimenkul</option>
+                <option value="Otomotiv">Otomotiv</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="row-2">
+            <label class="field">
+              <span class="label">Ton</span>
+              <select id="f-tone">
+                <option value="informative">Bilgilendirici</option>
+                <option value="friendly">Samimi / Sohbet</option>
+                <option value="professional">Uzman / Profesyonel</option>
+                <option value="persuasive">İkna Edici / Satış</option>
+                <option value="exciting">Heyecan Verici</option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="label">Uzunluk</span>
+              <select id="f-length">
+                <option value="short">Kısa (~500 kelime)</option>
+                <option value="medium" selected>Orta (~900 kelime)</option>
+                <option value="long">Uzun (~1400 kelime)</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="row-2">
+            <label class="field">
+              <span class="label">Odak Anahtar Kelime <em>(opsiyonel)</em></span>
+              <input type="text" id="f-keyword" placeholder="Örn. balkon sebze bahçesi" maxlength="80" />
+            </label>
+            <label class="field">
+              <span class="label">Hedef Kitle <em>(opsiyonel)</em></span>
+              <input type="text" id="f-audience" placeholder="Örn. yeni başlayanlar, ev sahipleri" maxlength="80" />
+            </label>
+          </div>
+
+          <div class="seo-toggle-row">
+            <button type="button" class="btn ghost seo-toggle-btn" id="toggle-advanced">
+              <span id="advanced-icon">▶</span> Gelişmiş <em class="seo-toggle-hint">rakip içerik + özel talimat</em>
+            </button>
+          </div>
+          <div class="collapsible" id="advanced-box" hidden>
+            <label class="field">
+              <span class="label">Rakip / Referans İçerik</span>
+              <textarea id="f-competitor" rows="3" placeholder="Rakip sayfanın başlıklarını veya notlarını yapıştır — AI daha kapsamlı yazsın…"></textarea>
+            </label>
+            <label class="field" style="margin-bottom:0">
+              <span class="label">Özel Talimat</span>
+              <textarea id="f-instructions" rows="2" placeholder="Örn. markamdan 2 kez bahset, resmi dil kullan, örnek ekle…"></textarea>
+            </label>
+          </div>
+
+          <!-- SEO meta box -->
+          <div class="meta-box" id="meta-box" hidden>
+            <div class="meta-item">
+              <span class="meta-label">SEO Başlık</span>
+              <p class="meta-val" id="m-title"></p>
+              <span class="meta-hint" id="m-title-len"></span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Meta Açıklama</span>
+              <p class="meta-val" id="m-desc"></p>
+              <span class="meta-hint" id="m-desc-len"></span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Odak Anahtar Kelime</span>
+              <p class="meta-val keyword-chip" id="m-keyword"></p>
+            </div>
+
+            <div class="scores-grid">
+              <div class="score-col">
+                <span class="meta-label">SEO Skoru</span>
+                <div class="score-bar-wrap"><div class="score-bar" id="m-seo-bar"></div></div>
+                <span class="score-num" id="m-seo-num">—</span>
+              </div>
+              <div class="score-col">
+                <span class="meta-label">Okunabilirlik</span>
+                <div class="score-bar-wrap"><div class="score-bar" id="m-read-bar"></div></div>
+                <span class="score-num" id="m-read-num">—</span>
+              </div>
+            </div>
+
+            <div class="meta-item" id="lsi-section" hidden>
+              <span class="meta-label">LSI Anahtar Kelimeler <em class="label-hint">tıkla → kopyala</em></span>
+              <div class="chips" id="lsi-chips"></div>
+            </div>
+
+            <div class="tips-list" id="tips-list"></div>
+
+            <div class="seo-toggle-row" id="schema-row" hidden>
+              <button type="button" class="btn ghost seo-toggle-btn" id="toggle-schema">
+                <span id="schema-icon">▶</span> Schema.org JSON-LD
+              </button>
+              <button type="button" class="btn ghost" id="btn-copy-schema">📋 Kopyala</button>
+            </div>
+            <div class="collapsible" id="schema-box" hidden>
+              <pre class="schema-pre" id="schema-pre"></pre>
+            </div>
+          </div>
+
+          <div class="actions" id="write-actions" hidden>
+            <button class="btn primary" id="btn-copy-md">📋 Markdown</button>
+            <button class="btn primary" id="btn-copy-html">🔤 HTML</button>
+            <button class="btn" id="btn-copy-meta">🔖 Meta+LSI</button>
+            <button class="btn" id="btn-download">⤓ İndir (.md)</button>
+            <button class="btn" id="btn-download-html">⤓ .html</button>
+            <button class="btn save" id="btn-save">💾 Arşive Kaydet</button>
+          </div>
+        </div>
+
+        <!-- ---- preview ---- -->
+        <div class="card preview-card">
+          <div class="card-head">
+            <h2>Önizleme</h2>
+            <div class="head-actions">
+              <span class="reading-badge" id="reading-badge" hidden></span>
+            </div>
+          </div>
+          <div class="article-preview" id="article-preview">
+            <div class="empty-preview">
+              <div class="empty-art">📄</div>
+              <p>Bir konu başlığı gir ve <strong>⚡ Üret</strong>'e bas.</p>
+              <p class="muted small">İlk kez mi? Sağ üstteki ⚙️'den erişim jetonunu gir.</p>
+            </div>
+          </div>
+          <!-- FAQ -->
+          <div class="faq-block" id="faq-block" hidden>
+            <h3 class="faq-title">❓ Sıkça Sorulan Sorular</h3>
+            <div id="faq-list"></div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============================ BULK VIEW ============================ -->
+    <section class="view" id="view-bulk" role="tabpanel" hidden>
+      <div class="card">
+        <div class="card-head"><h2>⚡ Toplu Makale Üretimi</h2></div>
+        <p class="hint">Bir kategori seç → AI başlık önersin → istediklerini işaretle → hepsi sırayla üretilip <b>Arşiv</b>'e kaydedilsin. Kahve molası zamanı ☕</p>
+        <div class="row-3">
+          <label class="field">
+            <span class="label">Kategori</span>
+            <select id="bulk-category"></select>
+          </label>
+          <label class="field">
+            <span class="label">Çıktı Dili</span>
+            <select id="bulk-language"></select>
+          </label>
+          <label class="field">
+            <span class="label">Uzunluk</span>
+            <select id="bulk-length">
+              <option value="short">Kısa (~500)</option>
+              <option value="medium" selected>Orta (~900)</option>
+              <option value="long">Uzun (~1400)</option>
+            </select>
+          </label>
+        </div>
+        <div class="input-row" style="margin-top:4px">
+          <input type="text" id="bulk-niche" placeholder="Niş / alt konu (opsiyonel) — örn. veganlara özel" maxlength="80" />
+          <button class="btn primary" id="bulk-suggest">💡 Başlık Öner</button>
+        </div>
+
+        <div class="ideas-list" id="bulk-list" style="margin-top:14px"></div>
+        <p class="ideas-empty" id="bulk-empty">Henüz öneri yok. 💡 Başlık Öner'e bas.</p>
+
+        <div class="bulk-foot" id="bulk-foot" hidden>
+          <label class="check-row">
+            <input type="checkbox" id="bulk-select-all" /> <span>Tümünü seç</span>
+          </label>
+          <span class="ideas-count" id="bulk-count">0 seçili</span>
+          <div class="spacer"></div>
+          <button class="btn primary" id="bulk-build" disabled>✨ Seçilenleri Üret</button>
+        </div>
+
+        <div class="bulk-progress" id="bulk-progress" hidden>
+          <div class="progress-track"><div class="progress-fill" id="bulk-progress-fill"></div></div>
+          <p class="progress-label" id="bulk-progress-label"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ ARCHIVE VIEW ============================ -->
+    <section class="view" id="view-archive" role="tabpanel" hidden>
+      <div class="archive-toolbar">
+        <input type="search" id="a-search" placeholder="🔎 Arşivde ara (başlık, anahtar kelime)" />
+        <div class="spacer"></div>
+        <button class="btn ghost" id="btn-export">⤓ JSON</button>
+        <button class="btn ghost" id="btn-export-csv">⤓ CSV</button>
+        <button class="btn ghost" id="btn-import">⤒ İçe Aktar</button>
+        <input type="file" id="file-import" accept="application/json" hidden />
+      </div>
+      <div class="archive-list" id="archive-list"></div>
+      <div class="empty" id="archive-empty" hidden>
+        <div class="empty-art">🗂️</div>
+        <h3>Arşiv boş</h3>
+        <p>Bir makale üretip <b>Arşive Kaydet</b>'e bas.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- ============================ IDEAS MODAL ============================ -->
+  <div class="modal" id="modal-ideas" hidden aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-dialog" role="dialog" aria-labelledby="ideas-title" aria-modal="true">
+      <header class="modal-head">
+        <h2 id="ideas-title">💡 Konu Önerileri</h2>
+        <button class="icon-btn" data-close aria-label="Kapat">✕</button>
+      </header>
+      <div class="modal-body">
+        <p class="hint">Seçtiğin kategori ve dil için başlıklar. Birine tıkla → forma dolsun.</p>
+        <div class="ideas-list" id="ideas-list"></div>
+        <p class="ideas-empty" id="ideas-empty">Yükleniyor…</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ SETTINGS MODAL ============================ -->
+  <div class="modal" id="modal-settings" hidden aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-dialog" role="dialog" aria-labelledby="settings-title" aria-modal="true">
+      <header class="modal-head">
+        <h2 id="settings-title">⚙️ Ayarlar</h2>
+        <button class="icon-btn" data-close aria-label="Kapat">✕</button>
+      </header>
+      <div class="modal-body">
+        <label class="field">
+          <span class="label">Erişim Jetonu</span>
+          <input type="password" id="s-token" placeholder="Aboneliğinizle verilen jeton" autocomplete="off" spellcheck="false" />
+          <span class="hint">Yönetici tarafından size verilir. Yalnızca bu tarayıcıda (<code>localStorage</code>) saklanır.</span>
+        </label>
+        <label class="field">
+          <span class="label">Sunucu Adresi <em>(gelişmiş)</em></span>
+          <input type="text" id="s-api-base" placeholder="/api" autocomplete="off" spellcheck="false" />
+          <span class="hint">Uygulama sunucu ile aynı adreste ise boş bırakın. Ayrı barındırma için tam URL girin (örn. https://api.siteniz.com).</span>
+        </label>
+        <label class="field">
+          <span class="label">Model</span>
+          <select id="s-model">
+            <option value="">Sunucu varsayılanı (önerilen)</option>
+            <option value="claude-opus-4-7">claude-opus-4-7 · en kaliteli</option>
+            <option value="claude-sonnet-4-6">claude-sonnet-4-6 · dengeli</option>
+            <option value="claude-haiku-4-5">claude-haiku-4-5 · en hızlı/ucuz</option>
+          </select>
+          <span class="hint">Sunucu izin verirse geçerli olur, aksi halde varsayılan kullanılır.</span>
+        </label>
+        <div id="s-health" class="health-note" hidden></div>
+      </div>
+      <footer class="modal-foot">
+        <button class="btn ghost" id="s-test">🔌 Bağlantıyı Test Et</button>
+        <div class="spacer"></div>
+        <button class="btn ghost" data-close>İptal</button>
+        <button class="btn primary" id="s-save">💾 Kaydet</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- ============================ ARCHIVE CARD TEMPLATE ============================ -->
+  <template id="archive-card-tpl">
+    <article class="a-card">
+      <header class="a-head">
+        <div>
+          <h3 class="a-title"></h3>
+          <div class="a-meta">
+            <span class="a-lang badge"></span>
+            <span class="a-keyword"></span>
+            <span class="a-score"></span>
+          </div>
+        </div>
+        <time class="a-date"></time>
+      </header>
+      <p class="a-desc"></p>
+      <footer class="a-actions">
+        <button class="btn primary a-load" title="Yazı sekmesine yükle">✏️ Aç</button>
+        <button class="btn a-copy-md">📋 Markdown</button>
+        <button class="btn a-copy-html">🔤 HTML</button>
+        <button class="btn a-download">⤓ .md</button>
+        <button class="btn ghost a-del">🗑️</button>
+      </footer>
+    </article>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
