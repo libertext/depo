@@ -25,6 +25,9 @@
       <button class="tab" data-tab="archive" role="tab" aria-selected="false">
         🗂️ Arşiv <span class="count" id="archiveCount">0</span>
       </button>
+      <button class="tab" data-tab="seo" role="tab" aria-selected="false">
+        📄 SEO <span class="count" id="seoCount">0</span>
+      </button>
       <button class="icon-btn" id="btn-settings" title="Ayarlar" aria-label="Ayarlar">⚙️</button>
     </nav>
   </header>
@@ -135,6 +138,206 @@
       </div>
     </section>
 
+    <!-- ============ SEO MAKALE VIEW ============ -->
+    <section class="view" id="view-seo" role="tabpanel" hidden>
+
+      <div class="grid">
+
+        <!-- Form Card -->
+        <div class="card form-card">
+          <div class="card-head">
+            <h2>📄 SEO Makale Üretici</h2>
+            <div class="head-actions">
+              <button class="btn ghost" id="seo-btn-ideas">💡 Konu Öner</button>
+              <button class="btn ghost" id="seo-btn-clear">🧹 Temizle</button>
+            </div>
+          </div>
+
+          <label class="field">
+            <span class="label">Konu Başlığı <em>(⚡ ile AI tüm makaleyi yazar)</em></span>
+            <div class="input-row">
+              <input type="text" id="seo-topic" placeholder="Örn. Evde sebze yetiştirme rehberi yeni başlayanlar için" maxlength="150" />
+              <button type="button" class="btn primary gen-btn" id="seo-btn-gen">⚡ Üret</button>
+            </div>
+            <span class="hint"><span id="seo-c-topic">0</span>/150 karakter</span>
+          </label>
+
+          <div class="seo-row">
+            <label class="field">
+              <span class="label">Konu Türü</span>
+              <select id="seo-category">
+                <option value="genel">Genel / Karışık</option>
+                <option value="teknoloji">Teknoloji / Yazılım</option>
+                <option value="saglik">Sağlık / Yaşam</option>
+                <option value="finans">Finans / Ekonomi</option>
+                <option value="hukuk">Hukuk / Mevzuat</option>
+                <option value="egitim">Eğitim / Kişisel Gelişim</option>
+                <option value="is">İş / Girişim</option>
+                <option value="yemek">Yemek / Tarif</option>
+                <option value="seyahat">Seyahat / Gezi</option>
+                <option value="moda">Moda / Güzellik</option>
+                <option value="spor">Spor / Fitness</option>
+                <option value="ev">Ev / Dekorasyon</option>
+                <option value="oyun">Oyun / Eğlence</option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="label">Ton</span>
+              <select id="seo-tone">
+                <option value="bilgilendirici">Bilgilendirici</option>
+                <option value="samimi">Samimi / Sohbet Havası</option>
+                <option value="uzman">Uzman / Profesyonel</option>
+                <option value="heyecan">Heyecan Verici</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="seo-row">
+            <label class="field">
+              <span class="label">Odak Anahtar Kelime <em>(opsiyonel)</em></span>
+              <input type="text" id="seo-keyword" placeholder="Örn. balkon sebze bahçesi" maxlength="80" />
+            </label>
+            <label class="field">
+              <span class="label">Makale Uzunluğu</span>
+              <select id="seo-length">
+                <option value="kisa">Kısa (~500 kelime)</option>
+                <option value="orta" selected>Orta (~800 kelime)</option>
+                <option value="uzun">Uzun (~1200 kelime)</option>
+              </select>
+            </label>
+          </div>
+
+          <!-- Competitor content (collapsible) -->
+          <div class="seo-toggle-row">
+            <button type="button" class="btn ghost seo-toggle-btn" id="seo-toggle-competitor">
+              <span id="seo-competitor-icon">▶</span> Rakip İçerik Ekle
+              <em class="seo-toggle-hint">opsiyonel — AI bunu referans alarak daha kapsamlı yazar</em>
+            </button>
+          </div>
+          <div class="seo-collapsible" id="seo-competitor-box" hidden>
+            <label class="field" style="margin:0">
+              <textarea id="seo-competitor" rows="3" placeholder="Rakip sitenin URL'sini, başlıklarını veya içerik notlarını yapıştır…"></textarea>
+            </label>
+          </div>
+
+          <!-- SEO Meta Box (appears after generation) -->
+          <div class="seo-meta-box" id="seo-meta-box" hidden>
+
+            <div class="seo-meta-item">
+              <span class="seo-meta-label">SEO Başlık</span>
+              <p class="seo-meta-val" id="seo-meta-title"></p>
+              <span class="seo-meta-hint" id="seo-meta-title-len"></span>
+            </div>
+
+            <div class="seo-meta-item">
+              <span class="seo-meta-label">Meta Açıklama</span>
+              <p class="seo-meta-val" id="seo-meta-desc"></p>
+              <span class="seo-meta-hint" id="seo-meta-desc-len"></span>
+            </div>
+
+            <div class="seo-meta-item">
+              <span class="seo-meta-label">Odak Anahtar Kelime</span>
+              <p class="seo-meta-val seo-keyword-chip" id="seo-meta-keyword"></p>
+            </div>
+
+            <!-- SEO + Readability scores side by side -->
+            <div class="seo-scores-grid">
+              <div class="seo-score-col">
+                <span class="seo-meta-label">SEO Skoru</span>
+                <div class="seo-score-bar-wrap">
+                  <div class="seo-score-bar" id="seo-score-bar"></div>
+                </div>
+                <span class="seo-score-num" id="seo-score-num">—</span>
+              </div>
+              <div class="seo-score-col">
+                <span class="seo-meta-label">Okunabilirlik</span>
+                <div class="seo-score-bar-wrap">
+                  <div class="seo-score-bar" id="seo-read-bar"></div>
+                </div>
+                <span class="seo-score-num" id="seo-read-num">—</span>
+              </div>
+            </div>
+
+            <!-- LSI Keywords -->
+            <div class="seo-meta-item" id="seo-lsi-section" hidden>
+              <span class="seo-meta-label">LSI Anahtar Kelimeler <em class="seo-label-hint">tıkla → kopyala</em></span>
+              <div class="seo-lsi-chips" id="seo-lsi-chips"></div>
+            </div>
+
+            <!-- Internal link suggestions -->
+            <div class="seo-meta-item" id="seo-intlinks-section" hidden>
+              <span class="seo-meta-label">İç Link Önerileri <em class="seo-label-hint">arşivden ilgili makaleler</em></span>
+              <div class="seo-intlinks" id="seo-intlinks"></div>
+            </div>
+
+            <!-- SEO Tips -->
+            <div class="seo-tips" id="seo-tips-list"></div>
+
+            <!-- Schema.org (collapsible) -->
+            <div class="seo-toggle-row" id="seo-schema-row" hidden>
+              <button type="button" class="btn ghost seo-toggle-btn" id="seo-toggle-schema">
+                <span id="seo-schema-icon">▶</span> Schema.org JSON-LD
+              </button>
+              <button type="button" class="btn ghost" id="seo-btn-copy-schema">📋 Kopyala</button>
+            </div>
+            <div class="seo-collapsible" id="seo-schema-box" hidden>
+              <pre class="seo-schema-pre" id="seo-schema-pre"></pre>
+            </div>
+
+          </div><!-- /seo-meta-box -->
+
+          <div class="seo-actions">
+            <button class="btn primary" id="seo-btn-copy-article">📋 Makaleyi Kopyala</button>
+            <button class="btn primary" id="seo-btn-copy-meta">🔖 Meta + LSI Kopyala</button>
+            <button class="btn" id="seo-btn-save">💾 Arşive Kaydet</button>
+            <button class="btn wp-btn" id="seo-btn-wp" title="WordPress sitenize gönderin">🌐 WordPress'e Gönder</button>
+          </div>
+        </div><!-- /form-card -->
+
+        <!-- Preview Card -->
+        <div class="card preview-card">
+          <div class="card-head">
+            <h2>Makale Önizleme</h2>
+            <div class="head-actions">
+              <span class="seo-reading-badge" id="seo-reading-badge" hidden></span>
+            </div>
+          </div>
+          <div class="seo-article-preview" id="seo-article-preview">
+            <div class="seo-empty-preview">
+              <div class="empty-art">📄</div>
+              <p>Konu başlığı gir ve <strong>⚡ Üret</strong>'e bas.</p>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /grid -->
+
+      <!-- Saved Articles Archive -->
+      <div class="seo-archive-section">
+        <div class="archive-toolbar">
+          <h3 class="view-title">💾 Kayıtlı SEO Makaleler</h3>
+          <div class="spacer"></div>
+          <button class="btn ghost" id="seo-btn-calendar">📅 Takvim</button>
+          <button class="btn ghost" id="seo-btn-export-csv">⤓ CSV İndir</button>
+          <button class="btn ghost" id="seo-btn-export">⤓ JSON İndir</button>
+          <button class="btn ghost" id="seo-btn-clear-archive">🧹 Arşivi Temizle</button>
+        </div>
+
+        <!-- Calendar view (hidden by default) -->
+        <div class="seo-calendar-view" id="seo-calendar-view" hidden>
+          <div class="seo-calendar-list" id="seo-calendar-list"></div>
+        </div>
+
+        <div class="seo-archive-list" id="seo-archive-list"></div>
+        <div class="empty" id="seo-archive-empty" hidden>
+          <div class="empty-art">📄</div>
+          <h3>Henüz kayıtlı makale yok</h3>
+          <p>Makale üretip <b>Arşive Kaydet</b>'e bas.</p>
+        </div>
+      </div>
+
+    </section>
+
   </main>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -187,6 +390,86 @@
     </div>
   </div>
 
+  <!-- ============ SEO IDEAS MODAL ============ -->
+  <div class="modal" id="modal-seo-ideas" hidden aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-dialog wide" role="dialog" aria-labelledby="seo-ideas-title" aria-modal="true">
+      <header class="modal-head">
+        <h2 id="seo-ideas-title">💡 SEO Konu Havuzu</h2>
+        <button class="icon-btn" data-close aria-label="Kapat">✕</button>
+      </header>
+      <div class="modal-body">
+        <div class="ideas-row">
+          <label class="field" style="flex:1 1 220px; margin:0;">
+            <span class="label">Konu Türü</span>
+            <select id="si-category">
+              <option value="genel">Genel / Karışık</option>
+              <option value="teknoloji">Teknoloji / Yazılım</option>
+              <option value="saglik">Sağlık / Yaşam</option>
+              <option value="finans">Finans / Ekonomi</option>
+              <option value="hukuk">Hukuk / Mevzuat</option>
+              <option value="egitim">Eğitim / Kişisel Gelişim</option>
+              <option value="is">İş / Girişim</option>
+              <option value="yemek">Yemek / Tarif</option>
+              <option value="seyahat">Seyahat / Gezi</option>
+              <option value="moda">Moda / Güzellik</option>
+              <option value="spor">Spor / Fitness</option>
+              <option value="ev">Ev / Dekorasyon</option>
+              <option value="oyun">Oyun / Eğlence</option>
+            </select>
+          </label>
+          <button class="btn primary" id="si-gen">⚡ Konu Öner</button>
+          <button class="btn ghost" id="si-add-more">➕ Daha Öner</button>
+        </div>
+        <p class="hint">Konuları işaretle (çoklu seçim), sonra ✨ <b>Seçilenleri Üret</b>'e bas. Her konu ayrı makale olarak üretilir ve arşive kaydedilir.</p>
+        <div class="ideas-list" id="seo-ideas-list"></div>
+        <p class="ideas-empty" id="seo-ideas-empty">Henüz öneri yok. ⚡ Konu Öner'e bas.</p>
+      </div>
+      <footer class="modal-foot ideas-foot" id="seo-ideas-foot" hidden>
+        <label class="check-row">
+          <input type="checkbox" id="si-select-all" />
+          <span>Tümünü seç</span>
+        </label>
+        <span class="ideas-count" id="si-count">0 seçili</span>
+        <div class="spacer"></div>
+        <button class="btn primary" id="si-build" disabled>✨ Seçilenleri Üret</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- ============ WORDPRESS PUBLISH MODAL ============ -->
+  <div class="modal" id="modal-wp-publish" hidden aria-hidden="true">
+    <div class="modal-backdrop" data-wp-close></div>
+    <div class="modal-dialog" role="dialog" aria-labelledby="wp-publish-title" aria-modal="true">
+      <header class="modal-head">
+        <h2 id="wp-publish-title">🌐 WordPress'e Gönder</h2>
+        <button class="icon-btn" data-wp-close aria-label="Kapat">✕</button>
+      </header>
+      <div class="modal-body">
+        <div class="wp-preview-box">
+          <span class="seo-meta-label">Gönderilecek Makale</span>
+          <p id="wp-preview-title" class="seo-meta-val" style="margin-top:4px"></p>
+          <p id="wp-preview-site" class="seo-meta-hint" style="margin-top:2px"></p>
+        </div>
+        <label class="field" style="margin-top:12px">
+          <span class="label">Gönderi Durumu</span>
+          <select id="wp-status">
+            <option value="draft">📝 Taslak olarak kaydet</option>
+            <option value="publish">🚀 Hemen Yayınla</option>
+          </select>
+          <span class="hint">Taslak = WordPress panelinden gözden geçirip yayınlarsın.</span>
+        </label>
+        <div class="wp-info-note">
+          ℹ️ Makale başlığı, içerik (HTML'e dönüştürülür) ve meta açıklama gönderilir. Yoast / RankMath kuruluysa odak anahtar kelime de aktarılır.
+        </div>
+      </div>
+      <footer class="modal-foot">
+        <button class="btn ghost" data-wp-close>İptal</button>
+        <button class="btn primary" id="wp-btn-send">🚀 Gönder</button>
+      </footer>
+    </div>
+  </div>
+
   <!-- ============ SETTINGS MODAL ============ -->
   <div class="modal" id="modal-settings" hidden aria-hidden="true">
     <div class="modal-backdrop" data-close></div>
@@ -213,6 +496,27 @@
           </select>
           <span class="hint">Opus = en kaliteli metin. Haiku = hızlı ve ucuz, günlük üretim için yeterli.</span>
         </label>
+
+        <div class="settings-sep"><span>🌐 WordPress Bağlantısı</span></div>
+
+        <label class="field">
+          <span class="label">Site URL</span>
+          <input type="url" id="s-wp-url" placeholder="https://siteniz.com" autocomplete="off" />
+          <span class="hint">HTTPS gereklidir. Sonunda / olmadan yazın.</span>
+        </label>
+        <label class="field">
+          <span class="label">Kullanıcı Adı</span>
+          <input type="text" id="s-wp-user" placeholder="admin" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span class="label">Uygulama Şifresi</span>
+          <input type="password" id="s-wp-pass" placeholder="xxxx xxxx xxxx xxxx xxxx xxxx" autocomplete="off" />
+          <span class="hint">
+            WP Yönetici → Kullanıcılar → Profilim → <b>Uygulama Şifreleri</b>'nden oluşturun (WordPress 5.6+).
+            <button type="button" class="btn ghost" id="s-wp-test" style="padding:2px 8px;font-size:11px">🔌 Bağlantıyı Test Et</button>
+          </span>
+        </label>
+        <div id="s-wp-result" style="margin-top:4px;padding:8px 10px;border-radius:6px;font-size:12px;display:none"></div>
       </div>
       <footer class="modal-foot">
         <button class="btn ghost" data-close>İptal</button>
@@ -260,6 +564,37 @@
         <button class="btn r-edit" title="Editöre yükle">✏️ Editöre At</button>
         <button class="btn r-save" title="Arşive kaydet">💾 Arşivle</button>
         <button class="btn ghost r-del" title="Listeden sil">🗑️</button>
+      </footer>
+    </article>
+  </template>
+
+  <template id="seo-article-tpl">
+    <article class="seo-a-card">
+      <header class="a-head">
+        <div>
+          <h3 class="seo-a-title"></h3>
+          <div class="seo-a-meta">
+            <span class="seo-a-keyword"></span>
+            <span class="seo-a-score"></span>
+            <span class="seo-a-versions badge" hidden></span>
+          </div>
+        </div>
+        <time class="a-date"></time>
+      </header>
+      <p class="seo-a-desc"></p>
+      <div class="seo-a-date-row">
+        <label class="seo-a-date-label">
+          📅 Yayın Tarihi:
+          <input type="date" class="seo-a-target-date" title="Yayın tarihini ayarla" />
+        </label>
+      </div>
+      <footer class="a-actions">
+        <button class="btn primary seo-a-copy-article">📋 Makale</button>
+        <button class="btn primary seo-a-copy-meta">🔖 Meta</button>
+        <button class="btn wp-btn seo-a-wp" title="WordPress'e gönder">🌐 WP</button>
+        <button class="btn seo-a-regen" title="Makaleyi yapay zeka ile yeniden yaz">🔄 Yeniden Yaz</button>
+        <button class="btn seo-a-edit">✏️ Düzenle</button>
+        <button class="btn ghost seo-a-del">🗑️</button>
       </footer>
     </article>
   </template>

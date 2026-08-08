@@ -5,6 +5,9 @@ const STORAGE_KEY  = 'yalin-anlatir.archive.v1';
 const DRAFT_KEY    = 'yalin-anlatir.draft.v1';
 const SETTINGS_KEY = 'yalin-anlatir.settings.v1';
 const RESULTS_KEY  = 'yalin-anlatir.results.v1';
+const SEO_STORAGE_KEY = 'seo-writer.articles.v1';
+const SEO_DRAFT_KEY   = 'seo-writer.draft.v1';
+const WP_SETTINGS_KEY = 'seo-writer.wp.v1';
 
 const EMOJIS = ['⚖️','🚓','👮','🧑‍⚖️','📜','📝','🔒','🔓','💼','🏛️','👤','🚗','🚨','⏱️','📞','💰','🏠','👨‍👩‍👧','💍','📄','🚫','✅','❗','❓','💡','🎯'];
 
@@ -492,8 +495,21 @@ const settings = {
         model:  $('#s-model').value,
       };
       this.saveValues(v);
+      wp.saveSettings({
+        url:  $('#s-wp-url').value.trim(),
+        user: $('#s-wp-user').value.trim(),
+        pass: $('#s-wp-pass').value.trim(),
+      });
       this.close();
       toast(v.apiKey ? '⚙️ Ayarlar kaydedildi' : '⚙️ Anahtar boş — üret kullanılmaz');
+    });
+    $('#s-wp-test').addEventListener('click', () => {
+      wp.saveSettings({
+        url:  $('#s-wp-url').value.trim(),
+        user: $('#s-wp-user').value.trim(),
+        pass: $('#s-wp-pass').value.trim(),
+      });
+      wp.testConnection();
     });
   },
 
@@ -501,6 +517,10 @@ const settings = {
     const s = this.load();
     $('#s-api-key').value = s.apiKey;
     $('#s-model').value   = s.model;
+    const wps = wp.loadSettings();
+    $('#s-wp-url').value  = wps.url  || '';
+    $('#s-wp-user').value = wps.user || '';
+    $('#s-wp-pass').value = wps.pass || '';
     this.modal.hidden = false;
     this.modal.setAttribute('aria-hidden', 'false');
     setTimeout(() => $('#s-api-key').focus(), 30);
@@ -569,10 +589,10 @@ HUKUKİ DOĞRULUK:
 Sadece aracı çağır, başka metin üretme.`;
 
 const ai = {
-  async _call({ system, tool, userMessage, s }) {
+  async _call({ system, tool, userMessage, s, maxTokens = 1024 }) {
     const body = {
       model: s.model || 'claude-opus-4-7',
-      max_tokens: 1024,
+      max_tokens: maxTokens,
       system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
       tools: [tool],
       tool_choice: { type: 'tool', name: tool.name },
@@ -984,6 +1004,1026 @@ const results = {
   },
 };
 
+/* ---------------- SEO: System Prompts ---------------- */
+const SEO_ARTICLE_SYSTEM_PROMPT = `Sen web siteleri için Google'da üst sıralarda yer alacak, okuyucuyu çeken, SEO uyumlu Türkçe makaleler yazan uzman bir içerik editörüsün.
+
+GÖREV: Kullanıcı konu başlığı, kategori, ton ve uzunluk bilgisi verecek. "write_seo_article" aracını çağırarak eksiksiz bir makale döndür. Başka metin üretme.
+
+SEO BAŞLIĞI (seoTitle): 55-65 karakter arası, kesinlikle. Odak kelimeyi başa yakın koy. Merak uyandıran, tıklanabilir.
+
+META AÇIKLAMA (metaDescription): 150-160 karakter arası, kesinlikle. Odak kelimeyi içersin. Net fayda vaat et, CTA ile bitir.
+
+ODAK ANAHTAR KELİME (focusKeyword): 2-4 kelimelik hedefli arama terimi.
+
+İÇERİK (content) — Markdown formatı:
+- # H1 başlığı, ## en az 3 H2, ### gerektiğinde H3
+- İlk 100 kelimede odak kelimeyi kullan
+- Her H2'de 2-4 paragraf, madde listeleri (- ile), **kalın** vurgu
+- Sonuç bölümü + CTA; Kısa ~500 | Orta ~800 | Uzun ~1200 kelime
+
+LSI ANAHTAR KELİMELER (lsiKeywords): 8-12 adet, odak kelimeyle anlam bağı olan, 1-4 kelimelik arama terimleri. Makale içinde kullanılabilecek türde seç.
+
+OKUNABİLİRLİK SKORU (readabilityScore): 0-100 tam sayı. Kısa cümle ve sade kelime = yüksek. Türkçe okuyucu için değerlendir.
+
+OKUNABİLİRLİK SEVİYESİ (readabilityLevel): "Kolay" (80+), "Orta" (50-79) veya "İleri" (0-49).
+
+SCHEMA.ORG (articleSchema): JSON-LD formatında Schema.org Article nesnesi (string). @type:"Article", headline, description, keywords, inLanguage:"tr", datePublished (bugün). Yalnızca JSON nesnesini ver, script etiketi olmadan.
+
+SEO SKORU (seoScore): 0-100; başlık/meta uzunluğu, kelime yoğunluğu, başlık hiyerarşisi, liste kullanımı.
+
+SEO İPUÇLARI (seoTips): 3-5 eyleme geçirilebilir Türkçe madde.
+
+OKUMA SÜRESİ (readingTimeMinutes): ~200 kelime/dk baz alınarak.
+
+Rakip içerik sağlanırsa orada işlenen konuları kapsayacak şekilde daha kapsamlı yaz.
+
+Yalnızca aracı çağır, önsöz veya açıklama ekleme.`;
+
+const SEO_TOPICS_SYSTEM_PROMPT = `Sen web siteleri için içerik stratejisi geliştiren bir SEO uzmanısın.
+
+GÖREV: Kullanıcı bir kategori verecek. "suggest_seo_topics" aracını çağırarak Google'da aranma potansiyeli yüksek 6-8 Türkçe makale başlığı öner.
+
+BAŞLIK KURALLARI:
+- 5-12 kelime arası, net ve açıklayıcı
+- Long-tail anahtar kelime içersin ("nasıl yapılır", "nedir", "rehber", "ipuçları", "avantajları" gibi)
+- Hem evergreen hem güncel konular dengele
+- Her başlık farklı bir açıyı ele alsın; tekrar etme
+- Geniş kitleyi hedefle, aşırı niş olmayan başlıklar seç
+
+Yalnızca aracı çağır, başka metin üretme.`;
+
+/* ---------------- SEO: AI methods ---------------- */
+ai.generateSeoArticle = function({ topic, category, keyword, tone, length, competitor }, s) {
+  const lengthMap = { kisa: '~500 kelime', orta: '~800 kelime', uzun: '~1200 kelime' };
+  const lengthDesc = lengthMap[length] || '~800 kelime';
+  let userMsg = `Konu: ${topic}\nKategori: ${category}\nOdak anahtar kelime: ${keyword || 'Otomatik belirle'}\nTon: ${tone}\nUzunluk hedefi: ${lengthDesc}`;
+  if (competitor && competitor.trim()) {
+    userMsg += `\n\nRakip referans içerik:\n${competitor.trim().slice(0, 800)}`;
+  }
+  userMsg += '\n\nBu parametrelerle tam SEO makalesi üret.';
+  return this._call({
+    system: SEO_ARTICLE_SYSTEM_PROMPT,
+    tool: {
+      name: 'write_seo_article',
+      description: 'SEO uyumlu makaleyi tüm alanlarıyla döndür.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          seoTitle:           { type: 'string', description: 'SEO başlığı, 55-65 karakter.' },
+          metaDescription:    { type: 'string', description: 'Meta açıklama, 150-160 karakter.' },
+          focusKeyword:       { type: 'string', description: 'Odak anahtar kelime (2-4 kelime).' },
+          readingTimeMinutes: { type: 'number', description: 'Tahmini okuma süresi (dakika).' },
+          seoScore:           { type: 'number', description: 'SEO skoru 0-100.' },
+          content:            { type: 'string', description: 'Markdown formatında makale içeriği.' },
+          seoTips:            { type: 'array', items: { type: 'string' }, description: '3-5 SEO iyileştirme önerisi.' },
+          lsiKeywords:        { type: 'array', items: { type: 'string' }, description: '8-12 LSI anahtar kelime.' },
+          readabilityScore:   { type: 'number', description: 'Okunabilirlik skoru 0-100.' },
+          readabilityLevel:   { type: 'string', description: '"Kolay", "Orta" veya "İleri".' },
+          articleSchema:      { type: 'string', description: 'JSON-LD Schema.org Article nesnesi (string).' },
+        },
+        required: ['seoTitle', 'metaDescription', 'focusKeyword', 'readingTimeMinutes', 'seoScore', 'content', 'seoTips', 'lsiKeywords', 'readabilityScore', 'readabilityLevel', 'articleSchema'],
+      },
+    },
+    userMessage: userMsg,
+    s,
+    maxTokens: 6000,
+  });
+};
+
+ai.suggestSeoTopics = async function(categoryLabel, s) {
+  const r = await this._call({
+    system: SEO_TOPICS_SYSTEM_PROMPT,
+    tool: {
+      name: 'suggest_seo_topics',
+      description: 'Verilen kategori için makale başlıklarını döndür.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          topics: {
+            type: 'array',
+            items: { type: 'string' },
+            minItems: 6,
+            maxItems: 8,
+            description: '6-8 adet SEO odaklı makale başlığı.',
+          },
+        },
+        required: ['topics'],
+      },
+    },
+    userMessage: `Kategori: ${categoryLabel}\n\nBu kategori için Google'da yüksek aranma potansiyeli olan, long-tail odaklı 6-8 Türkçe makale başlığı öner.`,
+    s,
+  });
+  return Array.isArray(r.topics) ? r.topics : [];
+};
+
+/* ---------------- SEO: Markdown renderer ---------------- */
+function simpleMarkdown(text) {
+  if (!text) return '';
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const inline = s => s
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+  const lines = text.split('\n');
+  const out = [];
+  let inUl = false;
+  let pBuf = [];
+
+  const flushP = () => {
+    if (pBuf.length) { out.push('<p>' + pBuf.join(' ') + '</p>'); pBuf = []; }
+  };
+  const flushUl = () => {
+    if (inUl) { out.push('</ul>'); inUl = false; }
+  };
+
+  for (const raw of lines) {
+    if (raw.startsWith('### ')) {
+      flushP(); flushUl();
+      out.push(`<h3>${inline(esc(raw.slice(4)))}</h3>`);
+    } else if (raw.startsWith('## ')) {
+      flushP(); flushUl();
+      out.push(`<h2>${inline(esc(raw.slice(3)))}</h2>`);
+    } else if (raw.startsWith('# ')) {
+      flushP(); flushUl();
+      out.push(`<h1>${inline(esc(raw.slice(2)))}</h1>`);
+    } else if (raw.startsWith('- ') || raw.startsWith('* ')) {
+      flushP();
+      if (!inUl) { out.push('<ul>'); inUl = true; }
+      out.push(`<li>${inline(esc(raw.slice(2)))}</li>`);
+    } else if (raw.trim() === '') {
+      flushP(); flushUl();
+    } else {
+      flushUl();
+      pBuf.push(inline(esc(raw)));
+    }
+  }
+  flushP(); flushUl();
+  return out.join('');
+}
+
+/* ---------------- SEO: Database ---------------- */
+const seoDB = {
+  list() {
+    try { return JSON.parse(localStorage.getItem(SEO_STORAGE_KEY) || '[]'); }
+    catch { return []; }
+  },
+  save(items) { localStorage.setItem(SEO_STORAGE_KEY, JSON.stringify(items)); },
+  add(item) {
+    const items = this.list();
+    items.unshift(item);
+    this.save(items);
+  },
+  remove(id) { this.save(this.list().filter(x => x.id !== id)); },
+  update(id, newData) {
+    const items = this.list();
+    const idx = items.findIndex(x => x.id === id);
+    if (idx === -1) return;
+    const old = items[idx];
+    const versions = old.versions || [];
+    versions.unshift({
+      seoTitle: old.seoTitle, metaDescription: old.metaDescription,
+      content: old.content, focusKeyword: old.focusKeyword,
+      seoScore: old.seoScore, savedAt: Date.now(),
+    });
+    items[idx] = { ...old, ...newData, versions, updatedAt: Date.now() };
+    this.save(items);
+  },
+  setDate(id, date) {
+    const items = this.list();
+    const idx = items.findIndex(x => x.id === id);
+    if (idx === -1) return;
+    items[idx].targetDate = date || null;
+    this.save(items);
+  },
+};
+
+/* ---------------- SEO: Category labels ---------------- */
+const SEO_CATEGORY_LABELS = {
+  genel:     'Genel / Karışık',
+  teknoloji: 'Teknoloji / Yazılım',
+  saglik:    'Sağlık / Yaşam',
+  finans:    'Finans / Ekonomi',
+  hukuk:     'Hukuk / Mevzuat',
+  egitim:    'Eğitim / Kişisel Gelişim',
+  is:        'İş / Girişim',
+  yemek:     'Yemek / Tarif',
+  seyahat:   'Seyahat / Gezi',
+  moda:      'Moda / Güzellik',
+  spor:      'Spor / Fitness',
+  ev:        'Ev / Dekorasyon',
+  oyun:      'Oyun / Eğlence',
+};
+
+/* ---------------- SEO: Editor ---------------- */
+const seoEditor = {
+  currentArticle: null,
+  currentSchema:  null,
+
+  init() {
+    $('#seo-topic').addEventListener('input', () => {
+      $('#seo-c-topic').textContent = $('#seo-topic').value.length;
+    });
+    $('#seo-btn-gen').addEventListener('click', () => this.generate());
+    $('#seo-btn-clear').addEventListener('click', () => this.clear());
+    $('#seo-btn-copy-article').addEventListener('click', () => this.copyArticle());
+    $('#seo-btn-copy-meta').addEventListener('click', () => this.copyMeta());
+    $('#seo-btn-save').addEventListener('click', () => this.save());
+    $('#seo-btn-copy-schema').addEventListener('click', () => this.copySchema());
+    $('#seo-btn-wp').addEventListener('click', () => wpModal.open(this.currentArticle));
+
+    $('#seo-toggle-competitor').addEventListener('click', () => {
+      const box  = $('#seo-competitor-box');
+      const icon = $('#seo-competitor-icon');
+      box.hidden = !box.hidden;
+      icon.textContent = box.hidden ? '▶' : '▼';
+    });
+    $('#seo-toggle-schema').addEventListener('click', () => {
+      const box  = $('#seo-schema-box');
+      const icon = $('#seo-schema-icon');
+      box.hidden = !box.hidden;
+      icon.textContent = box.hidden ? '▶' : '▼';
+    });
+  },
+
+  async generate() {
+    const topic = $('#seo-topic').value.trim();
+    if (!topic) { toast('Önce bir konu başlığı yaz'); $('#seo-topic').focus(); return; }
+
+    const s = settings.load();
+    if (!s.apiKey) { toast('Önce ⚙️ Ayarlar\'dan API anahtarı gir'); settings.open(); return; }
+
+    const btn = $('#seo-btn-gen');
+    const origLabel = btn.textContent;
+    btn.disabled = true;
+    btn.classList.add('is-loading');
+    btn.textContent = '⏳ Yazılıyor…';
+
+    try {
+      const out = await ai.generateSeoArticle({
+        topic,
+        category:   SEO_CATEGORY_LABELS[$('#seo-category').value] || $('#seo-category').value,
+        keyword:    $('#seo-keyword').value.trim(),
+        tone:       $('#seo-tone').value,
+        length:     $('#seo-length').value,
+        competitor: $('#seo-competitor').value.trim(),
+      }, s);
+      this.currentArticle = { ...out, topic, category: $('#seo-category').value };
+      this.showArticle(out);
+      toast('⚡ Makale üretildi');
+    } catch (e) {
+      console.error(e);
+      toast('Üretim başarısız: ' + (e.message || 'bilinmeyen hata'));
+    } finally {
+      btn.disabled = false;
+      btn.classList.remove('is-loading');
+      btn.textContent = origLabel;
+    }
+  },
+
+  showArticle(data) {
+    $('#seo-article-preview').innerHTML = simpleMarkdown(data.content || '');
+    $('#seo-meta-box').hidden = false;
+
+    // SEO title
+    $('#seo-meta-title').textContent = data.seoTitle || '';
+    const tLen  = (data.seoTitle || '').length;
+    const tHint = $('#seo-meta-title-len');
+    tHint.textContent = `${tLen} karakter — ${tLen < 55 ? 'çok kısa' : tLen > 65 ? 'çok uzun' : 'ideal ✓'}`;
+    tHint.style.color = tLen >= 55 && tLen <= 65 ? 'var(--ok)' : 'var(--warn)';
+
+    // Meta description
+    $('#seo-meta-desc').textContent = data.metaDescription || '';
+    const dLen  = (data.metaDescription || '').length;
+    const dHint = $('#seo-meta-desc-len');
+    dHint.textContent = `${dLen} karakter — ${dLen < 150 ? 'kısa' : dLen > 160 ? 'uzun' : 'ideal ✓'}`;
+    dHint.style.color = dLen >= 150 && dLen <= 160 ? 'var(--ok)' : 'var(--warn)';
+
+    // Focus keyword
+    $('#seo-meta-keyword').textContent = data.focusKeyword || '—';
+
+    // SEO score
+    const sc = Math.min(100, Math.max(0, Math.round(data.seoScore || 0)));
+    const scBar = $('#seo-score-bar');
+    scBar.style.width      = sc + '%';
+    scBar.style.background = sc >= 80 ? 'var(--ok)' : sc >= 60 ? 'var(--warn)' : 'var(--danger)';
+    $('#seo-score-num').textContent = sc + ' / 100';
+
+    // Readability score
+    const rs = Math.min(100, Math.max(0, Math.round(data.readabilityScore || 0)));
+    const rsBar = $('#seo-read-bar');
+    rsBar.style.width      = rs + '%';
+    rsBar.style.background = rs >= 80 ? 'var(--ok)' : rs >= 50 ? 'var(--warn)' : 'var(--danger)';
+    $('#seo-read-num').textContent = `${rs} / 100 · ${data.readabilityLevel || '—'}`;
+
+    // LSI keywords — clickable chips
+    const lsiSection = $('#seo-lsi-section');
+    const lsiChips   = $('#seo-lsi-chips');
+    lsiChips.innerHTML = '';
+    if (data.lsiKeywords && data.lsiKeywords.length) {
+      lsiSection.hidden = false;
+      data.lsiKeywords.forEach(kw => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'seo-lsi-chip';
+        b.textContent = kw;
+        b.title = 'Kopyala: ' + kw;
+        b.addEventListener('click', async () => {
+          try { await copyText(kw); toast('📋 ' + kw); }
+          catch { toast('Kopyalanamadı'); }
+        });
+        lsiChips.appendChild(b);
+      });
+    } else {
+      lsiSection.hidden = true;
+    }
+
+    // Internal link suggestions from archive
+    this.showInternalLinks(data.focusKeyword, data.content);
+
+    // SEO tips
+    const tipsEl = $('#seo-tips-list');
+    tipsEl.innerHTML = '';
+    (data.seoTips || []).forEach(tip => {
+      const d = document.createElement('div');
+      d.className = 'seo-tip';
+      d.textContent = '💡 ' + tip;
+      tipsEl.appendChild(d);
+    });
+
+    // Schema.org JSON-LD
+    this.currentSchema = data.articleSchema || null;
+    const schemaRow = $('#seo-schema-row');
+    if (data.articleSchema) {
+      schemaRow.hidden = false;
+      $('#seo-schema-pre').textContent = data.articleSchema;
+      $('#seo-schema-box').hidden = true;
+      $('#seo-schema-icon').textContent = '▶';
+    } else {
+      schemaRow.hidden = true;
+    }
+
+    // Reading badge
+    const badge = $('#seo-reading-badge');
+    badge.hidden = false;
+    badge.textContent = `⏱️ ${Math.max(1, Math.round(data.readingTimeMinutes || 1))} dk okuma`;
+  },
+
+  showInternalLinks(focusKeyword, content) {
+    const section   = $('#seo-intlinks-section');
+    const container = $('#seo-intlinks');
+    container.innerHTML = '';
+
+    const all = seoDB.list();
+    if (all.length < 1) { section.hidden = true; return; }
+
+    const curKw      = (focusKeyword || '').toLowerCase();
+    const curContent = (content || '').toLowerCase();
+
+    const scored = all
+      .filter(it => it.id !== this.currentArticle?.id)
+      .map(it => {
+        const titleWords = (it.seoTitle || it.topic || '').toLowerCase().split(/\s+/);
+        const kw = (it.focusKeyword || '').toLowerCase();
+        let score = 0;
+        if (kw && curContent.includes(kw)) score += 3;
+        if (kw && curKw === kw) score -= 5;
+        titleWords.forEach(w => { if (w.length > 3 && curContent.includes(w)) score++; });
+        return { ...it, _score: score };
+      })
+      .filter(it => it._score > 0)
+      .sort((a, b) => b._score - a._score)
+      .slice(0, 4);
+
+    if (!scored.length) { section.hidden = true; return; }
+    section.hidden = false;
+
+    scored.forEach(it => {
+      const title = it.seoTitle || it.topic || '—';
+      const row = document.createElement('div');
+      row.className = 'seo-intlink';
+      const titleSpan = document.createElement('span');
+      titleSpan.className = 'seo-intlink-title';
+      titleSpan.textContent = title;
+      const copyBtn = document.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.className = 'seo-intlink-copy';
+      copyBtn.textContent = '📋 Başlık';
+      copyBtn.addEventListener('click', async () => {
+        try { await copyText(title); toast('📋 Başlık kopyalandı'); }
+        catch { toast('Kopyalanamadı'); }
+      });
+      row.appendChild(titleSpan);
+      row.appendChild(copyBtn);
+      container.appendChild(row);
+    });
+  },
+
+  clear() {
+    if ($('#seo-topic').value || this.currentArticle) {
+      if (!confirm('Editör temizlensin mi?')) return;
+    }
+    $('#seo-topic').value      = '';
+    $('#seo-keyword').value    = '';
+    $('#seo-competitor').value = '';
+    $('#seo-c-topic').textContent = '0';
+    this.currentArticle = null;
+    this.currentSchema  = null;
+    $('#seo-meta-box').hidden = true;
+    $('#seo-reading-badge').hidden = true;
+    $('#seo-competitor-box').hidden = true;
+    $('#seo-competitor-icon').textContent = '▶';
+    $('#seo-article-preview').innerHTML = `
+      <div class="seo-empty-preview">
+        <div class="empty-art">📄</div>
+        <p>Konu başlığı gir ve <strong>⚡ Üret</strong>'e bas.</p>
+      </div>`;
+    toast('🧹 Temizlendi');
+  },
+
+  async copyArticle() {
+    if (!this.currentArticle?.content) { toast('Önce bir makale üret'); return; }
+    try { await copyText(this.currentArticle.content); toast('📋 Makale kopyalandı'); }
+    catch { toast('Kopyalanamadı'); }
+  },
+
+  async copyMeta() {
+    if (!this.currentArticle) { toast('Önce bir makale üret'); return; }
+    const a   = this.currentArticle;
+    const lsi = (a.lsiKeywords || []).join(', ');
+    const text = `SEO Başlık: ${a.seoTitle || ''}\n\nMeta Açıklama: ${a.metaDescription || ''}\n\nOdak Anahtar Kelime: ${a.focusKeyword || ''}${lsi ? '\n\nLSI Kelimeler: ' + lsi : ''}`;
+    try { await copyText(text); toast('🔖 Meta + LSI kopyalandı'); }
+    catch { toast('Kopyalanamadı'); }
+  },
+
+  async copySchema() {
+    if (!this.currentSchema) { toast('Schema.org mevcut değil'); return; }
+    const wrapped = `<script type="application/ld+json">\n${this.currentSchema}\n<\/script>`;
+    try { await copyText(wrapped); toast('📋 Schema.org kopyalandı'); }
+    catch { toast('Kopyalanamadı'); }
+  },
+
+  save() {
+    if (!this.currentArticle) { toast('Önce bir makale üret'); return; }
+    seoDB.add({
+      id: newId(),
+      ...this.currentArticle,
+      topic:      $('#seo-topic').value.trim(),
+      category:   $('#seo-category').value,
+      createdAt:  Date.now(),
+      targetDate: null,
+      versions:   [],
+    });
+    seoArchive.refresh();
+    toast('💾 Makale arşive kaydedildi');
+  },
+
+  loadFrom(item) {
+    $('#seo-topic').value = item.topic || item.seoTitle || '';
+    $('#seo-c-topic').textContent = $('#seo-topic').value.length;
+    this.currentArticle = item;
+    this.currentSchema  = item.articleSchema || null;
+    this.showArticle(item);
+    tabs.show('seo');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  },
+};
+
+/* ---------------- SEO: Ideas (topic suggestions) ---------------- */
+const seoIdeas = {
+  modal: null,
+  pool: [],
+
+  init() {
+    this.modal = $('#modal-seo-ideas');
+    $('#seo-btn-ideas').addEventListener('click', () => this.open());
+    $('#si-gen').addEventListener('click', () => this.suggest(false));
+    $('#si-add-more').addEventListener('click', () => this.suggest(true));
+    $('#si-build').addEventListener('click', () => this.buildSelected());
+
+    $('#si-select-all').addEventListener('change', (e) => {
+      const on = e.target.checked;
+      this.pool.forEach(p => p.checked = on);
+      this.renderList();
+    });
+
+    this.modal.addEventListener('click', (e) => {
+      if (e.target.matches('[data-close]')) { this.close(); return; }
+      const pickBtn = e.target.closest('.seo-idea-pick');
+      if (pickBtn) { e.preventDefault(); this.pickToEditor(pickBtn.dataset.topic); return; }
+      const item = e.target.closest('.idea-item');
+      if (item && !e.target.matches('input[type="checkbox"]')) {
+        const cb = item.querySelector('input[type="checkbox"]');
+        if (cb) { cb.checked = !cb.checked; this.onToggle(cb); }
+      }
+    });
+
+    this.modal.addEventListener('change', (e) => {
+      if (e.target.matches('.seo-idea-check')) this.onToggle(e.target);
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (!this.modal.hidden && e.key === 'Escape') this.close();
+    });
+  },
+
+  open() {
+    this.modal.hidden = false;
+    this.modal.setAttribute('aria-hidden', 'false');
+    setTimeout(() => $('#si-category').focus(), 30);
+  },
+
+  close() {
+    this.modal.hidden = true;
+    this.modal.setAttribute('aria-hidden', 'true');
+  },
+
+  pickToEditor(topic) {
+    if (!topic) return;
+    $('#seo-topic').value = topic;
+    $('#seo-c-topic').textContent = topic.length;
+    this.close();
+    tabs.show('seo');
+    $('#seo-topic').focus();
+    toast('💡 Başlık editöre yapıştı — ⚡ Üret\'e bas');
+  },
+
+  onToggle(cb) {
+    const topic = cb.dataset.topic;
+    const item = this.pool.find(p => p.topic === topic);
+    if (item) item.checked = cb.checked;
+    cb.closest('.idea-item')?.classList.toggle('is-checked', cb.checked);
+    this.updateFooter();
+  },
+
+  updateFooter() {
+    const sel   = this.pool.filter(p => p.checked).length;
+    const total = this.pool.length;
+    $('#si-count').textContent = `${sel} seçili / ${total}`;
+    $('#si-build').disabled = sel === 0;
+    const all = $('#si-select-all');
+    all.checked       = total > 0 && sel === total;
+    all.indeterminate = sel > 0 && sel < total;
+    $('#seo-ideas-foot').hidden = total === 0;
+  },
+
+  renderList() {
+    const list  = $('#seo-ideas-list');
+    const empty = $('#seo-ideas-empty');
+    list.innerHTML = '';
+    if (!this.pool.length) {
+      empty.classList.remove('is-hidden');
+      empty.textContent = 'Henüz öneri yok. ⚡ Konu Öner\'e bas.';
+      this.updateFooter();
+      return;
+    }
+    empty.classList.add('is-hidden');
+    this.pool.forEach(p => {
+      const row = document.createElement('label');
+      row.className = 'idea-item' + (p.checked ? ' is-checked' : '');
+      row.innerHTML = `
+        <input type="checkbox" class="seo-idea-check" data-topic="${escAttr(p.topic)}" ${p.checked ? 'checked' : ''} />
+        <span class="idea-text"></span>
+        <button type="button" class="idea-pick seo-idea-pick" data-topic="${escAttr(p.topic)}" title="Editöre at">→ Editör</button>
+      `;
+      row.querySelector('.idea-text').textContent = p.topic;
+      list.appendChild(row);
+    });
+    this.updateFooter();
+  },
+
+  async suggest(append) {
+    const s = settings.load();
+    if (!s.apiKey) { toast('Önce ⚙️ Ayarlar\'dan API anahtarı gir'); this.close(); settings.open(); return; }
+
+    const cat   = $('#si-category').value;
+    const label = SEO_CATEGORY_LABELS[cat] || cat;
+    const btn   = append ? $('#si-add-more') : $('#si-gen');
+    const origLabel = btn.textContent;
+    btn.disabled = true;
+    btn.classList.add('is-loading');
+    btn.textContent = '⏳ Öneriliyor…';
+
+    try {
+      const topics = await ai.suggestSeoTopics(label, s);
+      const newOnes = topics.map(t => t.trim()).filter(t => t && !this.pool.some(p => p.topic === t));
+      if (!append) this.pool = [];
+      newOnes.forEach(t => this.pool.push({ topic: t, checked: false }));
+      this.renderList();
+      if (!newOnes.length) toast('Yeni konu üretilemedi');
+    } catch (e) {
+      console.error(e);
+      toast('Öneri başarısız: ' + (e.message || 'hata'));
+    } finally {
+      btn.disabled = false;
+      btn.classList.remove('is-loading');
+      btn.textContent = origLabel;
+    }
+  },
+
+  async buildSelected() {
+    const s = settings.load();
+    if (!s.apiKey) { toast('Önce ⚙️ Ayarlar\'dan API anahtarı gir'); this.close(); settings.open(); return; }
+
+    const selected = this.pool.filter(p => p.checked).map(p => p.topic);
+    if (!selected.length) { toast('En az 1 konu seç'); return; }
+
+    const btn = $('#si-build');
+    const origLabel = btn.textContent;
+    btn.disabled = true;
+    btn.classList.add('is-loading');
+
+    const cat    = SEO_CATEGORY_LABELS[$('#si-category').value] || $('#si-category').value;
+    const tone   = $('#seo-tone').value;
+    const length = $('#seo-length').value;
+    let ok = 0, fail = 0;
+
+    for (let i = 0; i < selected.length; i++) {
+      btn.textContent = `⏳ ${i + 1}/${selected.length} yazılıyor`;
+      try {
+        const out = await ai.generateSeoArticle({ topic: selected[i], category: cat, keyword: '', tone, length, competitor: '' }, s);
+        seoDB.add({ id: newId(), ...out, topic: selected[i], category: $('#si-category').value, createdAt: Date.now(), targetDate: null, versions: [] });
+        ok++;
+      } catch (e) {
+        console.error('SEO toplu üretim hatası:', selected[i], e);
+        fail++;
+      }
+    }
+
+    this.pool = this.pool.filter(p => !p.checked);
+    this.renderList();
+    this.close();
+    seoArchive.refresh();
+    tabs.show('seo');
+
+    if (fail === 0) toast(`✨ ${ok} makale üretildi ve arşive kaydedildi`);
+    else toast(`✨ ${ok} başarılı · ${fail} hata`);
+
+    btn.disabled = false;
+    btn.classList.remove('is-loading');
+    btn.textContent = origLabel;
+  },
+};
+
+/* ---------------- SEO: Archive ---------------- */
+const seoArchive = {
+  calendarVisible: false,
+
+  init() {
+    $('#seo-btn-export').addEventListener('click', () => this.exportJson());
+    $('#seo-btn-export-csv').addEventListener('click', () => this.exportCsv());
+    $('#seo-btn-clear-archive').addEventListener('click', () => this.clearAll());
+    $('#seo-btn-calendar').addEventListener('click', () => this.toggleCalendar());
+    this.refresh();
+  },
+
+  refresh() {
+    const items = seoDB.list();
+    $('#seoCount').textContent = items.length;
+
+    const list  = $('#seo-archive-list');
+    const empty = $('#seo-archive-empty');
+    list.innerHTML = '';
+
+    if (!items.length) { empty.hidden = false; return; }
+    empty.hidden = true;
+
+    const tpl = $('#seo-article-tpl');
+    items.forEach(it => {
+      const node = tpl.content.firstElementChild.cloneNode(true);
+      node.querySelector('.seo-a-title').textContent = it.seoTitle || it.topic || '—';
+      node.querySelector('.a-date').textContent       = fmtDate(it.updatedAt || it.createdAt);
+
+      const kwEl = node.querySelector('.seo-a-keyword');
+      kwEl.textContent = it.focusKeyword ? '🔑 ' + it.focusKeyword : '';
+      kwEl.hidden = !it.focusKeyword;
+
+      const scoreEl = node.querySelector('.seo-a-score');
+      if (it.seoScore != null) {
+        const sc = Math.round(it.seoScore);
+        scoreEl.textContent = `SEO ${sc}/100`;
+        scoreEl.className   = 'seo-a-score badge ' + (sc >= 80 ? 'ok' : sc >= 60 ? 'warn' : 'bad');
+      } else {
+        scoreEl.hidden = true;
+      }
+
+      const versEl = node.querySelector('.seo-a-versions');
+      const vCount = (it.versions || []).length;
+      if (vCount > 0) {
+        versEl.hidden = false;
+        versEl.textContent = `📋 ${vCount} sürüm`;
+      }
+
+      node.querySelector('.seo-a-desc').textContent = it.metaDescription || '';
+
+      const dateInput = node.querySelector('.seo-a-target-date');
+      dateInput.value = it.targetDate || '';
+      dateInput.addEventListener('change', (e) => {
+        seoDB.setDate(it.id, e.target.value);
+        if (this.calendarVisible) this.renderCalendar();
+        toast('📅 Yayın tarihi güncellendi');
+      });
+
+      node.querySelector('.seo-a-copy-article').addEventListener('click', async () => {
+        try { await copyText(it.content || ''); toast('📋 Makale kopyalandı'); }
+        catch { toast('Kopyalanamadı'); }
+      });
+      node.querySelector('.seo-a-copy-meta').addEventListener('click', async () => {
+        try {
+          const lsi  = (it.lsiKeywords || []).join(', ');
+          const text = `SEO Başlık: ${it.seoTitle || ''}\n\nMeta Açıklama: ${it.metaDescription || ''}\n\nOdak Anahtar Kelime: ${it.focusKeyword || ''}${lsi ? '\n\nLSI Kelimeler: ' + lsi : ''}`;
+          await copyText(text); toast('🔖 Meta + LSI kopyalandı');
+        } catch { toast('Kopyalanamadı'); }
+      });
+      node.querySelector('.seo-a-regen').addEventListener('click', () => this.regenerate(it));
+      node.querySelector('.seo-a-wp').addEventListener('click', () => wpModal.open(it));
+      node.querySelector('.seo-a-edit').addEventListener('click', () => seoEditor.loadFrom(it));
+      node.querySelector('.seo-a-del').addEventListener('click', () => {
+        if (!confirm(`"${it.seoTitle || it.topic}" silinsin mi?`)) return;
+        seoDB.remove(it.id);
+        this.refresh();
+        toast('🗑️ Silindi');
+      });
+      list.appendChild(node);
+    });
+
+    if (this.calendarVisible) this.renderCalendar();
+  },
+
+  async regenerate(item) {
+    const s = settings.load();
+    if (!s.apiKey) { toast('Önce ⚙️ Ayarlar\'dan API anahtarı gir'); settings.open(); return; }
+    if (!confirm(`"${item.seoTitle || item.topic}" yeniden yazılsın mı?\nMevcut sürüm geçmişe kaydedilir.`)) return;
+
+    toast('⏳ Yeniden yazılıyor…');
+    try {
+      const out = await ai.generateSeoArticle({
+        topic:      item.topic || item.seoTitle || '',
+        category:   SEO_CATEGORY_LABELS[item.category] || 'Genel / Karışık',
+        keyword:    item.focusKeyword || '',
+        tone:       'bilgilendirici',
+        length:     'orta',
+        competitor: '',
+      }, s);
+      seoDB.update(item.id, out);
+      this.refresh();
+      toast('✅ Yeniden yazıldı · eski sürüm geçmişte');
+    } catch (e) {
+      console.error(e);
+      toast('Başarısız: ' + (e.message || 'hata'));
+    }
+  },
+
+  toggleCalendar() {
+    this.calendarVisible = !this.calendarVisible;
+    $('#seo-calendar-view').hidden = !this.calendarVisible;
+    $('#seo-btn-calendar').textContent = this.calendarVisible ? '📅 Takvimi Kapat' : '📅 Takvim';
+    if (this.calendarVisible) this.renderCalendar();
+  },
+
+  renderCalendar() {
+    const list = $('#seo-calendar-list');
+    list.innerHTML = '';
+    const items      = seoDB.list();
+    const withDate   = items.filter(it => it.targetDate).sort((a, b) => a.targetDate.localeCompare(b.targetDate));
+    const noDate     = items.filter(it => !it.targetDate);
+
+    [...withDate, ...noDate].forEach(it => {
+      const div = document.createElement('div');
+      div.className = 'seo-cal-item';
+      const sc = it.seoScore != null ? `SEO ${Math.round(it.seoScore)}/100` : '';
+
+      const dateEl = document.createElement('span');
+      dateEl.className = 'seo-cal-date';
+      dateEl.textContent = it.targetDate
+        ? new Date(it.targetDate).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' })
+        : '📌 Tarihsiz';
+
+      const titleEl = document.createElement('span');
+      titleEl.className = 'seo-cal-title';
+      titleEl.textContent = it.seoTitle || it.topic || '—';
+
+      const scoreEl = document.createElement('span');
+      scoreEl.className = 'seo-cal-score';
+      scoreEl.textContent = sc;
+
+      div.appendChild(dateEl);
+      div.appendChild(titleEl);
+      div.appendChild(scoreEl);
+      list.appendChild(div);
+    });
+
+    if (!items.length) {
+      const p = document.createElement('p');
+      p.style.cssText = 'color:var(--muted);text-align:center;padding:16px;margin:0;font-size:13px';
+      p.textContent = 'Henüz kayıtlı makale yok.';
+      list.appendChild(p);
+    }
+  },
+
+  exportJson() {
+    const items = seoDB.list();
+    if (!items.length) { toast('Arşiv boş'); return; }
+    const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `seo-makaleler-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    toast('⤓ JSON dışa aktarıldı');
+  },
+
+  exportCsv() {
+    const items = seoDB.list();
+    if (!items.length) { toast('Arşiv boş'); return; }
+    const e = s => '"' + String(s || '').replace(/"/g, '""') + '"';
+    const rows = [
+      ['SEO Başlık','Meta Açıklama','Odak Anahtar Kelime','LSI Kelimeler','SEO Skoru','Okunabilirlik','Okunabilirlik Seviyesi','Yayın Tarihi','İçerik (Markdown)'].map(e).join(','),
+      ...items.map(it => [
+        it.seoTitle || '',
+        it.metaDescription || '',
+        it.focusKeyword || '',
+        (it.lsiKeywords || []).join('; '),
+        it.seoScore != null ? it.seoScore : '',
+        it.readabilityScore != null ? it.readabilityScore : '',
+        it.readabilityLevel || '',
+        it.targetDate || '',
+        it.content || '',
+      ].map(e).join(',')),
+    ];
+    const blob = new Blob(['﻿' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `seo-makaleler-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    toast('⤓ CSV indirildi — Excel\'e yapıştırmaya hazır');
+  },
+
+  clearAll() {
+    if (!seoDB.list().length) { toast('Arşiv zaten boş'); return; }
+    if (!confirm('Tüm SEO makaleler silinsin mi?')) return;
+    seoDB.save([]);
+    this.refresh();
+    toast('🧹 SEO arşivi temizlendi');
+  },
+};
+
+/* ---------------- WordPress integration ---------------- */
+const wp = {
+  loadSettings() {
+    try { return JSON.parse(localStorage.getItem(WP_SETTINGS_KEY) || '{}'); }
+    catch { return {}; }
+  },
+
+  saveSettings(v) { localStorage.setItem(WP_SETTINGS_KEY, JSON.stringify(v)); },
+
+  getAuthHeader(cfg) {
+    const { user, pass } = cfg;
+    return 'Basic ' + btoa(unescape(encodeURIComponent(user + ':' + pass)));
+  },
+
+  showTestResult(ok, msg) {
+    const el = $('#s-wp-result');
+    if (!el) return;
+    el.style.display = 'block';
+    el.style.background = ok ? 'rgba(34,197,94,.15)' : 'rgba(239,68,68,.15)';
+    el.style.color = ok ? '#16a34a' : '#dc2626';
+    el.style.border = `1px solid ${ok ? '#86efac' : '#fca5a5'}`;
+    el.textContent = msg;
+  },
+
+  async testConnection() {
+    const cfg = this.loadSettings();
+    const resultEl = $('#s-wp-result');
+    if (resultEl) { resultEl.style.display = 'block'; resultEl.textContent = '⏳ Test ediliyor…'; resultEl.style.background = 'rgba(100,116,139,.1)'; resultEl.style.color = 'var(--text-dim)'; resultEl.style.border = '1px solid var(--border)'; }
+
+    if (!cfg.url || !cfg.user || !cfg.pass) {
+      this.showTestResult(false, '⚠️ URL, kullanıcı adı ve uygulama şifresini doldurun.');
+      return false;
+    }
+    const base = cfg.url.replace(/\/$/, '');
+    const testUrl = `${base}/wp-json/wp/v2/users/me`;
+    try {
+      const res = await fetch(testUrl, {
+        headers: { Authorization: this.getAuthHeader(cfg) },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        this.showTestResult(true, `✅ Bağlandı! Kullanıcı: ${data.name || cfg.user}`);
+        return true;
+      }
+      const err = await res.json().catch(() => ({}));
+      this.showTestResult(false, `❌ HTTP ${res.status}: ${err.message || res.statusText}`);
+      return false;
+    } catch (e) {
+      const msg = e.message || '';
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+        this.showTestResult(false, '❌ CORS/ağ hatası — REST API kapalı veya CORS izni yok. Perfmatters ayarını kontrol edin.');
+      } else {
+        this.showTestResult(false, '❌ ' + msg);
+      }
+      return false;
+    }
+  },
+
+  async createPost({ title, content, excerpt, status }) {
+    const cfg = this.loadSettings();
+    if (!cfg.url || !cfg.user || !cfg.pass) throw new Error('WordPress ayarları eksik');
+    const base = cfg.url.replace(/\/$/, '');
+    const res = await fetch(`${base}/wp-json/wp/v2/posts`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: this.getAuthHeader(cfg),
+      },
+      body: JSON.stringify({ title, content, excerpt, status }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(`WP ${res.status}: ${err.message || res.statusText}`);
+    }
+    return res.json();
+  },
+};
+
+/* ---------------- WordPress publish modal ---------------- */
+const wpModal = {
+  modal: null,
+  currentArticle: null,
+
+  init() {
+    this.modal = $('#modal-wp-publish');
+    this.modal.addEventListener('click', (e) => {
+      if (e.target.matches('[data-wp-close]')) this.close();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (!this.modal.hidden && e.key === 'Escape') this.close();
+    });
+    $('#wp-btn-send').addEventListener('click', () => this.send());
+  },
+
+  open(article) {
+    if (!article) { toast('Önce bir makale seç'); return; }
+    const cfg = wp.loadSettings();
+    if (!cfg.url || !cfg.user || !cfg.pass) {
+      toast('Önce ⚙️ Ayarlar\'dan WordPress bilgilerini gir');
+      settings.open();
+      return;
+    }
+    this.currentArticle = article;
+    $('#wp-preview-title').textContent = article.seoTitle || article.topic || '—';
+    $('#wp-preview-site').textContent   = cfg.url || '';
+    $('#wp-status').value = 'draft';
+    this.modal.hidden = false;
+    this.modal.setAttribute('aria-hidden', 'false');
+  },
+
+  close() {
+    this.modal.hidden = true;
+    this.modal.setAttribute('aria-hidden', 'true');
+    this.currentArticle = null;
+  },
+
+  async send() {
+    const article = this.currentArticle;
+    if (!article) return;
+
+    const btn = $('#wp-btn-send');
+    const origLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Gönderiliyor…';
+
+    const status = $('#wp-status').value;
+    const htmlContent = simpleMarkdown(article.content || '');
+    const excerpt = article.metaDescription || '';
+
+    try {
+      const post = await wp.createPost({
+        title:   article.seoTitle || article.topic || 'SEO Makale',
+        content: htmlContent,
+        excerpt,
+        status,
+      });
+      const label = status === 'publish' ? 'Yayınlandı' : 'Taslak olarak kaydedildi';
+      toast(`✅ ${label}! Post ID: ${post.id}`);
+      this.close();
+    } catch (e) {
+      console.error('WP Publish error:', e);
+      let msg = e.message || 'bilinmeyen hata';
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('CORS')) {
+        msg = 'CORS/ağ hatası — F12 konsoluna bakın';
+      }
+      toast('❌ Gönderilemedi: ' + msg);
+      alert('WordPress Hata Detayı:\n\n' + e.message + '\n\nTarayıcı konsolunda (F12) daha fazla bilgi var.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = origLabel;
+    }
+  },
+};
+
 /* ---------------- Tabs ---------------- */
 const tabs = {
   init() {
@@ -1004,6 +2044,7 @@ const tabs = {
     });
     if (name === 'archive') archive.refresh();
     if (name === 'results') results.refresh();
+    if (name === 'seo') seoArchive.refresh();
   }
 };
 
@@ -1015,4 +2056,8 @@ document.addEventListener('DOMContentLoaded', () => {
   results.init();
   settings.init();
   ideas.init();
+  seoEditor.init();
+  seoIdeas.init();
+  seoArchive.init();
+  wpModal.init();
 });
